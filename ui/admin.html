@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hotel Admin — Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    background: #0b0b10; color: #e6e6ee;
+    min-height: 100%; -webkit-font-smoothing: antialiased;
+}
+:root {
+    --accent: #f39c12;
+    --ok: #2ecc71;
+    --err: #e74c3c;
+    --bg: #0b0b10;
+    --card: #17171f;
+    --card2: #1e1e28;
+    --border: #2a2a35;
+    --muted: #8b8b97;
+}
+a { color: var(--accent); }
+
+/* Login */
+#loginScreen {
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+}
+#loginForm {
+    background: var(--card);
+    padding: 36px 32px;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    width: 100%; max-width: 380px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.6);
+}
+#loginForm h1 {
+    font-size: 20px; margin-bottom: 4px; color: var(--accent);
+}
+#loginForm p { font-size: 12.5px; color: var(--muted); margin-bottom: 22px; }
+#loginForm input {
+    width: 100%; padding: 12px 14px;
+    background: var(--card2); border: 1px solid var(--border);
+    color: #fff; border-radius: 8px; font-size: 13.5px;
+    margin-bottom: 12px; font-family: inherit;
+    outline: none; transition: border .18s;
+}
+#loginForm input:focus { border-color: var(--accent); }
+#loginForm button {
+    width: 100%; padding: 12px;
+    background: var(--accent); color: #111;
+    border: none; border-radius: 8px;
+    font-weight: 700; font-size: 13.5px;
+    cursor: pointer; transition: opacity .18s;
+}
+#loginForm button:hover { opacity: .9; }
+#loginForm button:disabled { opacity: .5; cursor: wait; }
+#loginError { color: var(--err); font-size: 12.5px; margin-top: 12px; min-height: 16px; }
+
+/* Dashboard */
+#dashboard { display: none; min-height: 100vh; }
+header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 24px;
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 50;
+    backdrop-filter: blur(10px);
+}
+header h1 { font-size: 17px; color: var(--accent); font-weight: 700; }
+header .right { display: flex; gap: 10px; align-items: center; }
+header .user { font-size: 12px; color: var(--muted); }
+#signOutBtn {
+    padding: 8px 16px; background: transparent;
+    color: #fff; border: 1px solid var(--border);
+    border-radius: 20px; font-size: 12px;
+    font-weight: 600; cursor: pointer;
+    transition: background .18s, border .18s;
+}
+#signOutBtn:hover { background: var(--card2); border-color: var(--accent); }
+
+nav {
+    display: flex; gap: 4px;
+    padding: 12px 24px 0;
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+}
+nav button {
+    padding: 10px 18px;
+    background: transparent; border: none;
+    color: var(--muted); font-size: 13px;
+    font-weight: 600; cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color .18s, border .18s;
+    position: relative;
+}
+nav button.active { color: var(--accent); border-bottom-color: var(--accent); }
+nav button:hover:not(.active) { color: #dcdce6; }
+#fbBadge {
+    display: inline-block; margin-left: 6px;
+    background: var(--err); color: #fff;
+    border-radius: 10px; padding: 1px 7px;
+    font-size: 10px; font-weight: 700;
+}
+
+main { padding: 24px; max-width: 1200px; margin: 0 auto; }
+
+/* Cards */
+.card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px;
+    margin-bottom: 20px;
+}
+.card h3 {
+    font-size: 13px; text-transform: uppercase;
+    letter-spacing: .7px; color: var(--accent);
+    margin-bottom: 16px; font-weight: 700;
+}
+.card p.help { font-size: 12px; color: var(--muted); margin-bottom: 14px; line-height: 1.6; }
+
+/* Forms */
+label.field { display: block; margin-bottom: 14px; }
+label.field span {
+    display: block; font-size: 11px; color: var(--muted);
+    margin-bottom: 6px; text-transform: uppercase; letter-spacing: .5px;
+}
+input[type=text], input[type=email], textarea, input[type=file] {
+    width: 100%; padding: 11px 13px;
+    background: var(--card2); border: 1px solid var(--border);
+    color: #fff; border-radius: 8px;
+    font-size: 13px; font-family: inherit;
+    outline: none; transition: border .18s;
+}
+input[type=file] { padding: 8px; font-size: 12px; }
+input[type=text]:focus, input[type=email]:focus, textarea:focus {
+    border-color: var(--accent);
+}
+textarea { min-height: 90px; resize: vertical; }
+
+button.primary {
+    padding: 11px 22px; background: var(--accent); color: #111;
+    border: none; border-radius: 8px;
+    font-weight: 700; font-size: 13px;
+    cursor: pointer; transition: opacity .18s;
+}
+button.primary:hover { opacity: .9; }
+button.primary:disabled { opacity: .5; cursor: wait; }
+button.ghost {
+    padding: 9px 16px; background: transparent; color: #cfcfd6;
+    border: 1px solid var(--border); border-radius: 8px;
+    font-size: 12px; font-weight: 600; cursor: pointer;
+    transition: border .18s, color .18s;
+}
+button.ghost:hover { border-color: var(--accent); color: var(--accent); }
+button.danger { color: #ff8b8b; border-color: rgba(231,76,60,.5); }
+button.danger:hover { background: rgba(231,76,60,.15); }
+
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 600px) { .row { grid-template-columns: 1fr; } }
+
+.status { font-size: 12.5px; margin-top: 12px; min-height: 16px; }
+.status.ok { color: var(--ok); }
+.status.err { color: var(--err); }
+.status.info { color: var(--accent); }
+
+/* Room list */
+.room-list { display: flex; flex-direction: column; gap: 10px; }
+.room-item {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 16px;
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+}
+.room-item .info { flex: 1; min-width: 0; }
+.room-item .name { font-weight: 600; font-size: 13.5px; margin-bottom: 3px; }
+.room-item .meta { font-size: 11.5px; color: var(--muted); }
+.badge {
+    display: inline-block; padding: 2px 9px;
+    border-radius: 20px; font-size: 10.5px;
+    font-weight: 700; letter-spacing: .3px;
+}
+.badge.active { background: rgba(46,204,113,.2); color: var(--ok); }
+.badge.inactive { background: rgba(139,139,151,.15); color: var(--muted); }
+.room-item .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.room-item .actions button {
+    padding: 6px 12px; font-size: 11.5px;
+    border-radius: 6px; border: 1px solid var(--border);
+    background: transparent; color: #cfcfd6;
+    cursor: pointer; font-weight: 600;
+    transition: border .15s, color .15s;
+}
+.room-item .actions button:hover { border-color: var(--accent); color: var(--accent); }
+.room-item .actions button.del:hover { border-color: var(--err); color: var(--err); }
+
+/* Analytics */
+.stats-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px; margin-bottom: 24px;
+}
+.stat {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px; padding: 18px;
+}
+.stat .label {
+    font-size: 11px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .7px;
+    margin-bottom: 8px;
+}
+.stat .value { font-size: 26px; font-weight: 700; color: var(--accent); }
+.stat .value.ok { color: var(--ok); }
+.stat .sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+th, td {
+    text-align: left; padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+}
+th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; font-weight: 700; }
+tr:hover td { background: rgba(255,255,255,.02); }
+td.type { font-family: monospace; font-size: 11.5px; }
+td.type.view { color: #6ab8ff; }
+td.type.time_spent { color: #b78cff; }
+td.type.booking_click { color: var(--ok); }
+
+.empty {
+    text-align: center; padding: 40px 20px;
+    color: var(--muted); font-size: 13px;
+}
+
+/* Feedback */
+.fb-item {
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px;
+    margin-bottom: 12px;
+}
+.fb-item.unread { border-left: 3px solid var(--accent); }
+.fb-head {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 10px; flex-wrap: wrap;
+}
+.fb-name { font-weight: 600; font-size: 13.5px; }
+.fb-email { font-size: 12px; color: var(--muted); }
+.fb-date { font-size: 11px; color: var(--muted); margin-left: auto; }
+.fb-stars { color: var(--accent); font-size: 14px; letter-spacing: 1px; }
+.fb-msg { font-size: 13.5px; line-height: 1.55; color: #dcdce6; white-space: pre-wrap; }
+.fb-actions { margin-top: 12px; display: flex; gap: 8px; }
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div id="loginScreen">
+    <form id="loginForm">
+        <h1>🏨 Hotel Admin</h1>
+        <p>Sign in to manage rooms, view analytics, and read feedback.</p>
+        <input type="email" id="email" placeholder="admin@example.com" autocomplete="username" required>
+        <input type="password" id="password" placeholder="Password" autocomplete="current-password" required>
+        <button type="submit" id="signInBtn">Sign In</button>
+        <div id="loginError"></div>
+    </form>
+</div>
+
+<!-- ============ DASHBOARD ============ -->
+<div id="dashboard">
+    <header>
+        <h1>🏨 Hotel Admin Dashboard</h1>
+        <div class="right">
+            <span class="user" id="userEmail"></span>
+            <button id="signOutBtn">Sign Out</button>
+        </div>
+    </header>
+
+    <nav>
+        <button data-tab="rooms" class="active">Rooms</button>
+        <button data-tab="analytics">Analytics</button>
+        <button data-tab="feedback">Feedback <span id="fbBadge"></span></button>
+    </nav>
+
+    <main>
+        <!-- ROOMS TAB -->
+        <section id="roomsTab">
+            <div class="card">
+                <h3 id="formTitle">Upload New Room</h3>
+                <p class="help">
+                    Upload the JSON config exported from your 3D Environment Creator, plus any texture images referenced in it.
+                    Image filenames that match the config will be automatically replaced with hosted Supabase URLs.
+                    Data URLs inside the JSON will also be uploaded automatically.
+                </p>
+                <input type="hidden" id="editRoomId">
+                <label class="field"><span>Room Name</span>
+                    <input type="text" id="roomName" value="Luxury Hotel Suite">
+                </label>
+                <div class="row">
+                    <label class="field"><span>Price</span>
+                        <input type="text" id="roomPrice" value="$180 / Night">
+                    </label>
+                    <label class="field"><span>Description</span>
+                        <input type="text" id="roomDesc" value="Explore the room in full 360°.">
+                    </label>
+                </div>
+                <label class="field"><span>Config JSON (optional when editing)</span>
+                    <input type="file" id="configFile" accept=".json,application/json">
+                </label>
+                <label class="field"><span>Images (multiple)</span>
+                    <input type="file" id="imageFiles" multiple accept="image/*">
+                </label>
+                <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                    <button class="primary" id="saveRoomBtn">Save Room</button>
+                    <button class="ghost" id="cancelEditBtn" style="display:none;">Cancel Edit</button>
+                </div>
+                <div class="status" id="roomStatus"></div>
+            </div>
+
+            <div class="card">
+                <h3>Existing Rooms</h3>
+                <div class="room-list" id="roomList">
+                    <div class="empty">Loading rooms…</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ANALYTICS TAB -->
+        <section id="analyticsTab" style="display:none;">
+            <div class="card">
+                <h3>Overview</h3>
+                <div class="stats-grid">
+                    <div class="stat">
+                        <div class="label">Total Views</div>
+                        <div class="value" id="statViews">—</div>
+                        <div class="sub">360° tour loads</div>
+                    </div>
+                    <div class="stat">
+                        <div class="label">Total Time Spent</div>
+                        <div class="value ok" id="statTime">—</div>
+                        <div class="sub">All visitors combined</div>
+                    </div>
+                    <div class="stat">
+                        <div class="label">Booking Clicks</div>
+                        <div class="value" id="statBookings">—</div>
+                        <div class="sub">Book button presses</div>
+                    </div>
+                    <div class="stat">
+                        <div class="label">Feedback Received</div>
+                        <div class="value" id="statFeedback">—</div>
+                        <div class="sub">Total messages</div>
+                    </div>
+                </div>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <button class="ghost" id="refreshAnalyticsBtn">↻ Refresh</button>
+                    <span class="status info" id="analyticsStatus"></span>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Recent Events (last 30)</h3>
+                <div id="eventsWrap">
+                    <div class="empty">Loading…</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FEEDBACK TAB -->
+        <section id="feedbackTab" style="display:none;">
+            <div class="card">
+                <h3>Guest Feedback</h3>
+                <div style="display:flex; gap:10px; margin-bottom:16px; align-items:center;">
+                    <button class="ghost" id="refreshFeedbackBtn">↻ Refresh</button>
+                    <span class="status info" id="feedbackStatus"></span>
+                </div>
+                <div id="feedbackList">
+                    <div class="empty">Loading feedback…</div>
+                </div>
+            </div>
+        </section>
+    </main>
+</div>
+
+<script>
+/* =========================================================
+   SUPABASE CONFIG — replace with your project credentials
+   ========================================================= */
+const SUPABASE_URL      = 'https://iflufnduthjzhneahnrf.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_A4oOeh21FiTQN0k_5OvUOg_8F3fMFZs';
+
+if (!SUPABASE_URL.startsWith('http')) {
+    alert('Please set SUPABASE_URL and SUPABASE_ANON_KEY at the top of admin.html');
+}
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/* =========================================================
+   AUTH
+   ========================================================= */
+const loginScreen = document.getElementById('loginScreen');
+const dashboard   = document.getElementById('dashboard');
+const loginForm   = document.getElementById('loginForm');
+const loginError  = document.getElementById('loginError');
+
+loginForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    loginError.textContent = '';
+    const btn = document.getElementById('signInBtn');
+    btn.disabled = true;
+    try {
+        const { error } = await sb.auth.signInWithPassword({
+            email: document.getElementById('email').value.trim(),
+            password: document.getElementById('password').value
+        });
+        if (error) throw error;
+    } catch (err) {
+        loginError.textContent = err.message || 'Sign-in failed';
+    } finally {
+        btn.disabled = false;
+    }
+});
+
+document.getElementById('signOutBtn').addEventListener('click', async () => {
+    await sb.auth.signOut();
+    location.reload();
+});
+
+async function checkSession() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) {
+        loginScreen.style.display = 'none';
+        dashboard.style.display = 'block';
+        document.getElementById('userEmail').textContent = session.user.email || '';
+        loadRooms();
+        loadAnalytics();
+        loadFeedback();
+    } else {
+        loginScreen.style.display = 'flex';
+        dashboard.style.display = 'none';
+    }
+}
+
+sb.auth.onAuthStateChange((event, session) => {
+    if (session) {
+        loginScreen.style.display = 'none';
+        dashboard.style.display = 'block';
+        document.getElementById('userEmail').textContent = session.user.email || '';
+        loadRooms();
+        loadAnalytics();
+        loadFeedback();
+    } else {
+        loginScreen.style.display = 'flex';
+        dashboard.style.display = 'none';
+    }
+});
+
+/* =========================================================
+   TABS
+   ========================================================= */
+document.querySelectorAll('nav button').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const tab = btn.dataset.tab;
+        document.getElementById('roomsTab').style.display     = tab === 'rooms'     ? 'block' : 'none';
+        document.getElementById('analyticsTab').style.display = tab === 'analytics' ? 'block' : 'none';
+        document.getElementById('feedbackTab').style.display  = tab === 'feedback'  ? 'block' : 'none';
+        if (tab === 'analytics') loadAnalytics();
+        if (tab === 'feedback')  loadFeedback();
+    });
+});
+
+/* =========================================================
+   ROOMS
+   ========================================================= */
+const roomList = document.getElementById('roomList');
+const roomStatusEl = document.getElementById('roomStatus');
+let allRooms = [];
+
+function setStatus(el, msg, type) {
+    el.textContent = msg;
+    el.className = 'status ' + (type || '');
+}
+
+async function loadRooms() {
+    try {
+        const { data, error } = await sb.from('rooms').select('*').order('created_at', { ascending: false });
+        if (error) throw error;
+        allRooms = data || [];
+        renderRoomList();
+    } catch (e) {
+        roomList.innerHTML = '<div class="empty">Failed to load rooms: ' + e.message + '</div>';
+    }
+}
+
+function renderRoomList() {
+    if (!allRooms.length) {
+        roomList.innerHTML = '<div class="empty">No rooms yet. Upload one above to get started.</div>';
+        return;
+    }
+    roomList.innerHTML = allRooms.map(r => `
+        <div class="room-item" data-id="${r.id}">
+            <div class="info">
+                <div class="name">${escapeHtml(r.room_name)} ${r.is_active ? '<span class="badge active">ACTIVE</span>' : '<span class="badge inactive">INACTIVE</span>'}</div>
+                <div class="meta">${escapeHtml(r.price || '')} • created ${new Date(r.created_at).toLocaleDateString()}</div>
+            </div>
+            <div class="actions">
+                ${r.is_active ? '' : `<button data-action="activate">Activate</button>`}
+                <button data-action="edit">Edit</button>
+                <button data-action="delete" class="del">Delete</button>
+            </div>
+        </div>
+    `).join('');
+
+    roomList.querySelectorAll('.room-item').forEach(item => {
+        const id = item.dataset.id;
+        item.querySelectorAll('button[data-action]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const action = btn.dataset.action;
+                if (action === 'activate') activateRoom(id);
+                if (action === 'edit')     editRoom(id);
+                if (action === 'delete')   deleteRoom(id);
+            });
+        });
+    });
+}
+
+async function activateRoom(id) {
+    try {
+        const { error: e1 } = await sb.from('rooms').update({ is_active: false }).eq('is_active', true);
+        if (e1) throw e1;
+        const { error: e2 } = await sb.from('rooms').update({ is_active: true }).eq('id', id);
+        if (e2) throw e2;
+        await loadRooms();
+        setStatus(roomStatusEl, 'Room activated ✓', 'ok');
+    } catch (e) {
+        setStatus(roomStatusEl, 'Activation failed: ' + e.message, 'err');
+    }
+}
+
+async function deleteRoom(id) {
+    if (!confirm('Delete this room permanently? Its analytics events will also be removed.')) return;
+    try {
+        const { error } = await sb.from('rooms').delete().eq('id', id);
+        if (error) throw error;
+        await loadRooms();
+        setStatus(roomStatusEl, 'Room deleted', 'info');
+    } catch (e) {
+        setStatus(roomStatusEl, 'Delete failed: ' + e.message, 'err');
+    }
+}
+
+function editRoom(id) {
+    const room = allRooms.find(r => r.id === id);
+    if (!room) return;
+    document.getElementById('editRoomId').value = room.id;
+    document.getElementById('roomName').value = room.room_name || '';
+    document.getElementById('roomPrice').value = room.price || '';
+    document.getElementById('roomDesc').value = room.description || '';
+    document.getElementById('configFile').value = '';
+    document.getElementById('imageFiles').value = '';
+    document.getElementById('formTitle').textContent = 'Edit Room';
+    document.getElementById('saveRoomBtn').textContent = 'Update Room';
+    document.getElementById('cancelEditBtn').style.display = 'inline-block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+document.getElementById('cancelEditBtn').addEventListener('click', resetForm);
+
+function resetForm() {
+    document.getElementById('editRoomId').value = '';
+    document.getElementById('roomName').value = 'Luxury Hotel Suite';
+    document.getElementById('roomPrice').value = '$180 / Night';
+    document.getElementById('roomDesc').value = 'Explore the room in full 360°.';
+    document.getElementById('configFile').value = '';
+    document.getElementById('imageFiles').value = '';
+    document.getElementById('formTitle').textContent = 'Upload New Room';
+    document.getElementById('saveRoomBtn').textContent = 'Save Room';
+    document.getElementById('cancelEditBtn').style.display = 'none';
+    setStatus(roomStatusEl, '', '');
+}
+
+/* =========================================================
+   IMAGE PROCESSING
+   ========================================================= */
+async function processConfigImages(config, files, roomId) {
+    // Build filename -> file map
+    const fileMap = new Map();
+    for (const f of files || []) {
+        fileMap.set(f.name, f);
+        const noExt = f.name.replace(/\.[^.]+$/, '');
+        if (noExt !== f.name) fileMap.set(noExt, f);
+    }
+
+    // Upload files, build URL map
+    const urlMap = new Map();
+    for (const [name, file] of fileMap) {
+        try {
+            const safe = name.replace(/[^a-zA-Z0-9._-]/g, '_');
+            const path = `rooms/${roomId}/${Date.now()}-${safe}`;
+            const { error } = await sb.storage.from('hotel-assets').upload(path, file, {
+                upsert: true, contentType: file.type || 'application/octet-stream'
+            });
+            if (error) throw error;
+            const { data } = sb.storage.from('hotel-assets').getPublicUrl(path);
+            urlMap.set(name, data.publicUrl);
+            urlMap.set(file.name, data.publicUrl);
+        } catch (e) {
+            console.error('Upload failed:', name, e);
+        }
+    }
+
+    // Recursive replace
+    const dataUrlCache = new Map();
+    async function replace(node) {
+        if (typeof node === 'string') {
+            if (node.startsWith('data:image/')) {
+                if (dataUrlCache.has(node)) return dataUrlCache.get(node);
+                try {
+                    const blob = await (await fetch(node)).blob();
+                    const ext = (blob.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
+                    const name = `inline-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+                    const path = `rooms/${roomId}/${name}`;
+                    const { error } = await sb.storage.from('hotel-assets').upload(path, blob, {
+                        contentType: blob.type
+                    });
+                    if (error) throw error;
+                    const { data } = sb.storage.from('hotel-assets').getPublicUrl(path);
+                    dataUrlCache.set(node, data.publicUrl);
+                    return data.publicUrl;
+                } catch (e) {
+                    console.warn('Data URL upload failed', e);
+                    return node;
+                }
+            }
+            const basename = node.split('/').pop().split('?')[0];
+            if (urlMap.has(node)) return urlMap.get(node);
+            if (urlMap.has(basename)) return urlMap.get(basename);
+            return node;
+        }
+        if (Array.isArray(node)) {
+            const out = [];
+            for (const v of node) out.push(await replace(v));
+            return out;
+        }
+        if (node && typeof node === 'object') {
+            const out = {};
+            for (const [k, v] of Object.entries(node)) out[k] = await replace(v);
+            return out;
+        }
+        return node;
+    }
+    return replace(config);
+}
+
+/* =========================================================
+   SAVE ROOM
+   ========================================================= */
+document.getElementById('saveRoomBtn').addEventListener('click', async () => {
+    const name = document.getElementById('roomName').value.trim();
+    const price = document.getElementById('roomPrice').value.trim();
+    const desc = document.getElementById('roomDesc').value.trim();
+    const configFile = document.getElementById('configFile').files[0];
+    const imageFiles = document.getElementById('imageFiles').files;
+    const editId = document.getElementById('editRoomId').value;
+
+    if (!name) {
+        setStatus(roomStatusEl, 'Room name is required.', 'err');
+        return;
+    }
+
+    let config;
+    if (configFile) {
+        const text = await configFile.text();
+        try { config = JSON.parse(text); }
+        catch (e) {
+            setStatus(roomStatusEl, 'Invalid JSON: ' + e.message, 'err');
+            return;
+        }
+    } else if (editId) {
+        const { data } = await sb.from('rooms').select('config').eq('id', editId).single();
+        config = (data && data.config) || {};
+    } else {
+        config = {};
+    }
+
+    const roomId = editId || crypto.randomUUID();
+
+    try {
+        setStatus(roomStatusEl, 'Uploading images…', 'info');
+        config = await processConfigImages(config, imageFiles, roomId);
+
+        config.roomName = name;
+        config.price = price;
+        config.description = desc;
+
+        setStatus(roomStatusEl, 'Saving room…', 'info');
+        if (editId) {
+            const { error } = await sb.from('rooms').update({
+                room_name: name,
+                price: price,
+                description: desc,
+                config: config,
+                updated_at: new Date().toISOString()
+            }).eq('id', editId);
+            if (error) throw error;
+        } else {
+            const { error } = await sb.from('rooms').insert({
+                id: roomId,
+                room_name: name,
+                price: price,
+                description: desc,
+                config: config,
+                is_active: false
+            });
+            if (error) throw error;
+        }
+
+        setStatus(roomStatusEl, 'Saved ✓', 'ok');
+        resetForm();
+        await loadRooms();
+    } catch (e) {
+        console.error(e);
+        setStatus(roomStatusEl, 'Save failed: ' + e.message, 'err');
+    }
+});
+
+/* =========================================================
+   ANALYTICS
+   ========================================================= */
+async function loadAnalytics() {
+    try {
+        setStatus(document.getElementById('analyticsStatus'), 'Loading…', 'info');
+
+        const [viewsRes, bookingRes, timeRes, feedbackRes, eventsRes] = await Promise.all([
+            sb.from('analytics_events').select('*', { count: 'exact', head: true }).eq('event_type', 'view'),
+            sb.from('analytics_events').select('*', { count: 'exact', head: true }).eq('event_type', 'booking_click'),
+            sb.from('analytics_events').select('duration_seconds').eq('event_type', 'time_spent'),
+            sb.from('feedback').select('*', { count: 'exact', head: true }),
+            sb.from('analytics_events').select('*').order('created_at', { ascending: false }).limit(30)
+        ]);
+
+        const views = viewsRes.count || 0;
+        const bookings = bookingRes.count || 0;
+        const feedbackCount = feedbackRes.count || 0;
+        const totalSeconds = (timeRes.data || []).reduce((s, e) => s + (Number(e.duration_seconds) || 0), 0);
+
+        document.getElementById('statViews').textContent = views.toLocaleString();
+        document.getElementById('statBookings').textContent = bookings.toLocaleString();
+        document.getElementById('statFeedback').textContent = feedbackCount.toLocaleString();
+        document.getElementById('statTime').textContent = formatDuration(totalSeconds);
+
+        renderEvents(eventsRes.data || []);
+        setStatus(document.getElementById('analyticsStatus'), 'Updated', 'ok');
+    } catch (e) {
+        console.error(e);
+        setStatus(document.getElementById('analyticsStatus'), 'Load failed: ' + e.message, 'err');
+    }
+}
+
+function renderEvents(events) {
+    const wrap = document.getElementById('eventsWrap');
+    if (!events.length) {
+        wrap.innerHTML = '<div class="empty">No events yet.</div>';
+        return;
+    }
+    const roomMap = new Map(allRooms.map(r => [r.id, r.room_name]));
+    const rows = events.map(ev => {
+        const roomName = ev.room_id ? (roomMap.get(ev.room_id) || '—') : '—';
+        const detail = ev.event_type === 'time_spent' ? (Math.round(ev.duration_seconds) + 's') : '';
+        return `<tr>
+            <td class="type ${ev.event_type}">${escapeHtml(ev.event_type)}</td>
+            <td>${escapeHtml(roomName)}</td>
+            <td>${detail}</td>
+            <td>${new Date(ev.created_at).toLocaleString()}</td>
+        </tr>`;
+    }).join('');
+    wrap.innerHTML = `<table>
+        <thead><tr><th>Event</th><th>Room</th><th>Detail</th><th>When</th></tr></thead>
+        <tbody>${rows}</tbody>
+    </table>`;
+}
+
+document.getElementById('refreshAnalyticsBtn').addEventListener('click', loadAnalytics);
+
+/* =========================================================
+   FEEDBACK
+   ========================================================= */
+async function loadFeedback() {
+    try {
+        const { data, error } = await sb.from('feedback').select('*').order('created_at', { ascending: false }).limit(100);
+        if (error) throw error;
+        renderFeedback(data || []);
+        const unread = (data || []).filter(f => !f.is_read).length;
+        const badge = document.getElementById('fbBadge');
+        badge.textContent = unread ? unread : '';
+        badge.style.display = unread ? 'inline-block' : 'none';
+        setStatus(document.getElementById('feedbackStatus'), 'Updated', 'ok');
+    } catch (e) {
+        setStatus(document.getElementById('feedbackStatus'), 'Load failed: ' + e.message, 'err');
+        document.getElementById('feedbackList').innerHTML = '<div class="empty">Failed to load feedback.</div>';
+    }
+}
+
+function renderFeedback(items) {
+    const wrap = document.getElementById('feedbackList');
+    if (!items.length) {
+        wrap.innerHTML = '<div class="empty">No feedback yet.</div>';
+        return;
+    }
+    const roomMap = new Map(allRooms.map(r => [r.id, r.room_name]));
+    wrap.innerHTML = items.map(f => {
+        const stars = f.rating ? '★'.repeat(f.rating) + '☆'.repeat(5 - f.rating) : '';
+        const roomName = f.room_id ? (roomMap.get(f.room_id) || '—') : '—';
+        return `<div class="fb-item ${f.is_read ? '' : 'unread'}">
+            <div class="fb-head">
+                <span class="fb-name">${escapeHtml(f.name || 'Anonymous')}</span>
+                ${f.email ? `<span class="fb-email">${escapeHtml(f.email)}</span>` : ''}
+                ${stars ? `<span class="fb-stars">${stars}</span>` : ''}
+                <span class="fb-date">${new Date(f.created_at).toLocaleString()} • ${escapeHtml(roomName)}</span>
+            </div>
+            <div class="fb-msg">${escapeHtml(f.message)}</div>
+            <div class="fb-actions">
+                ${f.is_read ? '<span style="font-size:11.5px;color:var(--muted);">Read</span>' :
+                    `<button class="ghost" data-mark="${f.id}">Mark as read</button>`}
+                <button class="ghost danger" data-del="${f.id}">Delete</button>
+            </div>
+        </div>`;
+    }).join('');
+
+    wrap.querySelectorAll('[data-mark]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            await sb.from('feedback').update({ is_read: true }).eq('id', btn.dataset.mark);
+            loadFeedback();
+        });
+    });
+    wrap.querySelectorAll('[data-del]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            if (!confirm('Delete this feedback?')) return;
+            await sb.from('feedback').delete().eq('id', btn.dataset.del);
+            loadFeedback();
+        });
+    });
+}
+
+document.getElementById('refreshFeedbackBtn').addEventListener('click', loadFeedback);
+
+/* =========================================================
+   UTIL
+   ========================================================= */
+function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+}
+function formatDuration(seconds) {
+    seconds = Math.round(seconds);
+    if (seconds < 60) return seconds + 's';
+    const m = Math.floor(seconds / 60), s = seconds % 60;
+    if (m < 60) return m + 'm ' + s + 's';
+    const h = Math.floor(m / 60);
+    return h + 'h ' + (m % 60) + 'm';
+}
+
+/* =========================================================
+   BOOT
+   ========================================================= */
+checkSession();
+</script>
+</body>
+</html>

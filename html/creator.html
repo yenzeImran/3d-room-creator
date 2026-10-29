@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Environment Creator — Studio</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TransformControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+
+<link rel="stylesheet" href="creator.css">
+<link rel="stylesheet" href="school.css">
+<link rel="stylesheet" href="app-shell.css">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ============================= TOP MENUBAR ============================= -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="app-logo" title="Home">◈</div>
+      <div class="app-name">Studio</div>
+      <nav class="menubar">
+        <button class="menu-item">File</button>
+        <button class="menu-item">Edit</button>
+        <button class="menu-item">View</button>
+        <button class="menu-item">Help</button>
+      </nav>
+    </div>
+
+    <div class="topbar-center">
+      <div class="env-switcher">
+        <svg class="env-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 12 L12 3 L21 12 L12 21 Z"/>
+        </svg>
+        <select id="envType" class="env-select">
+          <option value="room">Room</option>
+          <option value="multi-room">Multi-Room (School)</option>
+          <option value="cube">Cube</option>
+          <option value="sphere">Sphere</option>
+          <option value="cylinder">Cylinder</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="topbar-right">
+      <button class="icon-btn" title="Reset Camera (⇧R)" onclick="resetCamera()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 12 a9 9 0 1 0 3-6.7 M3 4 v6 h6"/>
+        </svg>
+      </button>
+      <button class="icon-btn" title="Screenshot" onclick="downloadImage()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="6" width="18" height="14" rx="2"/>
+          <circle cx="12" cy="13" r="4"/>
+          <path d="M8 6 L9 3 H15 L16 6"/>
+        </svg>
+      </button>
+      <div class="divider-v"></div>
+      <button class="btn-primary topbar-create" onclick="createEnvironment()">Create</button>
+    </div>
+  </header>
+
+  <!-- ============================= WORKSPACE ============================= -->
+  <div class="workspace">
+
+    <!-- ---------- LEFT TOOL RAIL ---------- -->
+    <aside class="left-toolbar">
+      <button class="tool-btn" data-tool="select" title="Select (V)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 3 L4 18 L9 13.5 L12 20 L15 18.5 L12 12 L19 12 Z"/>
+        </svg>
+      </button>
+      <button class="tool-btn" data-tool="move" title="Move (M)" onclick="setTransformMode('translate')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2 V22 M2 12 H22"/>
+          <path d="M8 6 L12 2 L16 6 M8 18 L12 22 L16 18 M6 8 L2 12 L6 16 M18 8 L22 12 L18 16"/>
+        </svg>
+      </button>
+      <button class="tool-btn" data-tool="rotate" title="Rotate (R)" onclick="setTransformMode('rotate')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 12 a9 9 0 1 1 -3-6.7"/>
+          <path d="M21 3 V9 H15"/>
+        </svg>
+      </button>
+      <button class="tool-btn" data-tool="scale" title="Scale (S)" onclick="setTransformMode('scale')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 3 H15 M21 3 V9 M3 21 H9 M3 21 V15 M21 3 L14 10 M3 21 L10 14"/>
+        </svg>
+      </button>
+      <div class="tool-sep"></div>
+      <button class="tool-btn" data-tool="objects" title="Object Library" onclick="scrollToPanel('object-library-section')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="8" height="8" rx="1"/>
+          <rect x="13" y="3" width="8" height="8" rx="1"/>
+          <rect x="3" y="13" width="8" height="8" rx="1"/>
+          <rect x="13" y="13" width="8" height="8" rx="1"/>
+        </svg>
+      </button>
+      <button class="tool-btn" data-tool="materials" title="Materials" onclick="scrollToPanel('materials-section')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="9"/>
+          <circle cx="8" cy="9" r="1.5" fill="currentColor"/>
+          <circle cx="16" cy="9" r="1.5" fill="currentColor"/>
+          <circle cx="9" cy="16" r="1.5" fill="currentColor"/>
+          <circle cx="16" cy="15" r="1.5" fill="currentColor"/>
+        </svg>
+      </button>
+      <button class="tool-btn" data-tool="lights" title="Lighting" onclick="scrollToPanel('lighting-section')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 18 H15 M10 21 H14 M12 3 V6 M5 6 L7 8 M19 6 L17 8 M3 13 H6 M18 13 H21"/>
+          <path d="M9 18 A6 6 0 1 1 15 18"/>
+        </svg>
+      </button>
+    </aside>
+
+    <!-- ---------- CANVAS ---------- -->
+    <main class="main-content">
+      <div id="canvas-container"></div>
+
+      <div class="zoom-controls">
+        <button class="zoom-btn" onclick="zoomIn()" title="Zoom In">+</button>
+        <button class="zoom-btn" onclick="zoomOut()" title="Zoom Out">−</button>
+        <button class="zoom-btn" onclick="resetCamera()" title="Reset View">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="14" height="14">
+            <path d="M3 12 a9 9 0 1 0 3-6.7 M3 4 v6 h6"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="canvas-help">
+        <kbd>V</kbd> Select · <kbd>M</kbd> Move · <kbd>R</kbd> Rotate · <kbd>S</kbd> Scale · <kbd>Del</kbd> Delete · <kbd>Esc</kbd> Deselect
+      </div>
+    </main>
+
+    <!-- ---------- RIGHT PANEL ---------- -->
+    <aside class="sidebar">
+
+      <div class="panel-header">
+        <span class="panel-title">Inspector</span>
+        <button class="icon-btn-sm" title="Collapse all" onclick="collapseAllSections()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+            <path d="M6 9 L12 15 L18 9"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- ===== ENVIRONMENT TYPE (hidden fallback - the topbar select is the real one) ===== -->
+      <!-- kept for legacy code paths that toggle it -->
+
+      <!-- ===== AI EDGE REFINEMENT ===== -->
+      <div class="section-header" onclick="toggleSection(this)">
+        <span class="section-title">AI Refinement</span><span class="arrow">▾</span>
+      </div>
+      <div class="section-body">
+        <div class="block">
+          <div class="toggle-row">
+            <input type="checkbox" id="aiEnabled" checked onchange="setAIOption('enabled', this.checked)">
+            <label for="aiEnabled">Enable AI refinement</label>
+          </div>
+          <div class="toggle-row">
+            <input type="checkbox" id="aiPerspective" checked onchange="setAIOption('perspective', this.checked)">
+            <label for="aiPerspective">Straighten edges</label>
+          </div>
+          <div class="toggle-row">
+            <input type="checkbox" id="aiEnhance" checked onchange="setAIOption('enhance', this.checked)">
+            <label for="aiEnhance">Auto white-balance</label>
+          </div>
+          <div class="toggle-row">
+            <input type="checkbox" id="aiColorMatch" checked onchange="setAIOption('colorMatch', this.checked)">
+            <label for="aiColorMatch">Match colours</label>
+          </div>
+          <div class="toggle-row">
+            <input type="checkbox" id="aiEdgeBlend" checked onchange="setAIOption('edgeBlend', this.checked)">
+            <label for="aiEdgeBlend">Soften edges</label>
+          </div>
+          <div class="toggle-row">
+            <input type="checkbox" id="aiSeamless" onchange="setAIOption('seamless', this.checked)">
+            <label for="aiSeamless">Make tileable</label>
+          </div>
+          <button class="btn btn-primary btn-full" onclick="reprocessAllImages()">Re-run AI on All</button>
+        </div>
+      </div>
+
+      <!-- ===== ROOM TEXTURES ===== -->
+      <div class="section-header" onclick="toggleSection(this)">
+        <span class="section-title">Room Textures</span><span class="arrow">▾</span>
+      </div>
+      <div class="section-body">
+        <div class="block">
+          <label class="field-label">Base / Floor</label>
+          <input type="file" id="baseImageInput" class="file-input" accept="image/*">
+          <div class="preview-container" id="basePreview"></div>
+        </div>
+        <div class="block">
+          <label class="field-label">Walls</label>
+          <select id="wallOrder" class="field-select">
+            <option value="back-left-right-front">Back → Left → Right → Front</option>
+            <option value="left-front-right-back">Left → Front → Right → Back</option>
+            <option value="clockwise">Clockwise</option>
+            <option value="counterclockwise">Counterclockwise</option>
+          </select>
+          <input type="file" id="wallImagesInput" class="file-input" accept="image/*" multiple>
+          <div class="preview-container" id="wallPreview"></div>
+          <div id="wallAssignmentInfo" class="wall-assignment" style="display:none;"></div>
+        </div>
+        <div class="block">
+          <label class="field-label">Roof / Ceiling</label>
+          <input type="file" id="roofImageInput" class="file-input" accept="image/*">
+          <div class="preview-container" id="roofPreview"></div>
+        </div>
+      </div>
+
+      <!-- ===== OBJECT LIBRARY ===== -->
+      <div class="section-header" id="object-library-section" onclick="toggleSection(this)">
+        <span class="section-title">Object Library</span><span class="arrow">▾</span>
+      </div>
+      <div class="section-body">
+        <div class="block">
+          <div class="model-library">
+            <div class="model-category">
+              <h5>Furniture</h5>
+              <div class="model-list">
+                <div class="model-item" data-model="chair">Chair</div>
+                <div class="model-item" data-model="table">Table</div>
+                <div class="model-item" data-model="sofa">Sofa</div>
+                <div class="model-item" data-model="bed">Bed</div>
+              </div>
+            </div>
+            <div class="model-category">
+              <h5>Decor</h5>
+              <div class="model-list">
+                <div class="model-item" data-model="lamp">Lamp</div>
+                <div class="model-item" data-model="plant">Plant</div>
+                <div class="model-item" data-model="bookshelf">Bookshelf</div>
+                <div class="model-item" data-model="tv">TV</div>
+                <div class="model-item" data-model="rug">Rug</div>
+              </div>
+            </div>
+            <div class="model-category">
+              <h5>Shapes</h5>
+              <div class="model-list">
+                <div class="model-item" data-model="cube">Cube</div>
+                <div class="model-item" data-model="sphere">Sphere</div>
+                <div class="model-item" data-model="cylinder">Cylinder</div>
+                <div class="model-item" data-model="cone">Cone</div>
+                <div class="model-item" data-model="torus">Torus</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="block">
+          <label class="field-label">Import Custom Model</label>
+          <input type="file" id="componentImport" class="file-input" accept=".obj,.gltf,.glb" multiple>
+          <div class="field-hint">OBJ · GLTF · GLB</div>
+        </div>
+        <div class="block block-row">
+          <button class="btn btn-secondary" onclick="clearAllComponents()">Clear All</button>
+          <button class="btn btn-secondary" onclick="deleteSelectedComponent()">Delete Selected</button>
+        </div>
+      </div>
+
+      <!-- ===== SCENE LAYERS ===== -->
+      <div class="section-header" onclick="toggleSection(this)">
+        <span class="section-title">Scene Layers</span><span class="arrow">▾</span>
+      </div>
+      <div class="section-body">
+        <div class="block">
+          <div class="layers-list" id="layersList"></div>
+        </div>
+      </div>
+
+      <!-- ===== SELECTION PROPERTIES ===== -->
+      <div class="section-header" onclick="toggleSection(this)">
+        <span class="section-title">Selection</span><span class="arrow">▾</span>
+      </div>
+      <div class="section-body">
+        <div class="component-properties" id="componentProperties">
+          <div class="property-control">
+            <label class="field-label">Name</label>
+            <input type="text" id="componentName" onchange="onNameChange(this.value)">
+          </div>
+          <div class="property-control">
+            <label class="field-label">Layer</label>
+            <select id="componentLayer" onchange="onLayerChange(this.value)">
+              <option value="Furniture">Furniture</option>
+              <option value="Decor">Decor</option>
+              <option value="Shapes">Shapes</option>
+              <option value="Doors">Doors</option>
+              <option value="Windows">Windows</option>
+              <option value="Imported">Imported</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+
+          <div class="transform-controls">
+            <button class="btn btn-primary transform-btn" id="translateMode" onclick="setTransformMode('translate')">Move</button>
+            <button class="btn btn-secondary transform-btn" id="rotateMode" onclick="setTransformMode('rotate')">Rotate</button>
+            <button class="btn btn-secondary transform-btn" id="scaleMode" onclick="setTransformMode('scale')">Scale</button>
+          </div>
+
+          <div class="property-control">
+            <label class="field-label">Position</label>
+            <div class="property-row">
+              <input type="number" id="componentPositionX" step="0.1" value="0" placeholder="X">
+              <input type="number" id="componentPositionY" step="0.1" value="0" placeholder="Y">
+              <input type="number" id="componentPositionZ" step="0.1" value="0" placeholder="Z">
+            </div>
+          </div>
+          <div class="property-control">
+            <label class="field-label">Rotation Y (°)</label>
+            <input type="number" id="componentRotation" step="1" value="0">
+          </div>
+          <div class="property-control">
+            <label class="field-label">Scale</label>
+            <input type="number" id="componentScale" step="0.1" value="1" min="0.05" max="20">
+          </div>
+          <div class="property-control">
+            <label class="field-label">Color</label>
+            <input type="color" id="componentColor" value="#888888">
+          </div>
+
+          <div class="toggle-row">
+            <input type="checkbox" id="componentVisible" onchange="onVisibilityChange(this.checked)">
+            <label for="componentVisible">Visible</label>
+          </div>
+          <div class="toggle-row">
+            <input type="checkbox" id="componentLocked" onchange="onLockChange(this.checked)">
+            <label for="componentLocked">Locked</label>
+          </div>
+
+          <button class="btn btn-primary btn-full" onclick="updateSelectedComponent()">Apply</button>
+          <div class="block-row" style="margin-top:6px;">
+            <button class="btn btn-secondary" onclick="focusSelectedComponent()">Focus</button>
+            <button class="btn btn-secondary" onclick="duplicateSelectedComponent()">Duplicate</button>
+          </div>
+        </div>
+
+        <div class="component-properties" id="selectedLightProps">
+          <div class="property-control">
+            <label class="field-label">Intensity</label>
+            <div class="range-row">
+              <input type="range" id="selLightIntensity" min="0.1" max="8" step="0.1" value="1" oninput="onSelLightIntensityChange(this.value)">
+              <span id="selLightIntensityLabel">1.0</span>
+            </div>
+          </div>
+          <div class="property-control">
+            <label class="field-label">Color</label>
+            <input type="color" id="selLightColor" onchange="onSelLightColorChange(this.value)">
+          </div>
+          <div class="property-control" id="selLightDistanceWrap">
+            <label class="field-label">Distance (0 = infinite)</label>
+            <input type="number" id="selLightDistance" step="1" value="0" min="0" onchange="onSelLightDistanceChange(this.value)">
+          </div>
+          <button class="btn btn-danger btn-full" onclick="removeSelectedLight()">Remove Light</button>
+        </div>
+
+        <div class="block" id="noSelectionNotice">
+          <p class="help-text">Nothing selected. Click an object in the 3D view.</p>
+        </div>
+      </div>
+
+      <!-- ===== LIGHTING ===== -->
+      <div class="section-header" id="lighting-section" onclick="toggleSection(this)">
+        <span class="section-title">Lighting</span><span class="arrow">▾</span>
+      </div>
+      <div class="section-body">
+        <div class="block">
+          <div class="property-control">
+            <label class="field-label">Type</label>
+            <select id="newLightType">
+              <option value="point">Point</option>
+              <option value="spot">Spot</option>
+              <option value="directional">Directional</option>
+              <option value="ambient">Ambient</option>
+            </select>
+          </div>
+          <div class="property-control">
+            <label class="field-label">Intensity</label>
+            <div class="range-row">
+              <input type="range" id="newLightIntensity" min="0.1" max="5" step="0.1" value="1" oninput="document.getElementById('newLightIntensityLabel').textContent=parseFloat(this.value).toFixed(1)">
+              <span id="newLightIntensityLabel">1.0</span>
+            </div>
+          </div>
+          <div class="property-control">
+            <label class="field-label">Color</label>
+            <input type="color" id="newLightColor" value="#ffffff">
+          </div>
+          <button class="btn btn-primary btn-full" onclick="addLight()">Add Light</button>
+          <button class="btn btn-secondary btn-full" style="margin-top:6px;" onclick="clearAllLights()">Clear All Lights</button>
+        </div>
+      </div>
+
+      <!-- ===== ACTIONS ===== -->
+      <div class="section-header" onclick="toggleSection(this)">
+        <span class="section-title">Actions</span><span class="arrow">▾</span>
+      </div>
+      <div class="section-body">
+        <div class="block">
+            <button class="btn btn-primary btn-full" onclick="createEnvironment()" style="margin-bottom:6px;">Create 3D Environment</button>
+          <button class="btn btn-secondary btn-full" onclick="resetCamera()" style="margin-bottom:6px;">Reset Camera</button>
+          <button class="btn btn-success btn-full" onclick="downloadImage()" style="margin-bottom:6px;">Download Image</button>
+          <button class="btn btn-success btn-full" onclick="exportRoomPackage()">Export Room Package</button>
+        </div>
+      </div>
+
+    </aside>
+  </div>
+
+  <!-- ============================= STATUS BAR ============================= -->
+  <footer class="statusbar">
+    <div class="status-left">
+      <span class="status-dot"></span>
+      <span id="statusBarMode">Ready</span>
+    </div>
+    <div class="status-right">
+      <span id="statusBarObjects">0 objects</span>
+      <span class="divider-v"></span>
+      <span id="statusBarFps">— fps</span>
+      <span class="divider-v"></span>
+      <span id="statusBarCamera">0, 0, 0</span>
+    </div>
+  </footer>
+
+</div>
+
+<!-- Overlays -->
+<div class="loading" id="loading"><div class="spinner"></div><p>Creating your 3D environment...</p></div>
+<div id="status"></div>
+
+<!-- ============================= SCRIPTS ============================= -->
+
+<!-- 1. Shim & Core -->
+<script src="three-r128-shim.js"></script>
+<script src="creator.js"></script>
+<script src="expose-globals.js"></script> <!-- MUST BE HERE -->
+
+<!-- 2. School Core -->
+<script src="school-core.js"></script>
+<script src="school-materials.js"></script>
+<script src="school-view-toggle.js"></script>
+<script src="school-objects.js"></script>
+<script src="school-layout.js"></script>
+
+<!-- 3. Tour & Editor -->
+<script src="school-tour.js"></script>
+<script src="school-editor.js"></script>
+<script src="tour-360.js"></script>
+
+<!-- 4. Export & UI -->
+<script src="school-export.js"></script>
+<script src="school-ui.js"></script>
+<script src="school-ai.js"></script>
+<script src="school-splat.js"></script>
+
+<!-- 5. Upgrades & AI -->
+<script src="renderer-upgrade.js"></script>
+<script src="materials-library.js"></script>
+<script src="ai-builder.js"></script>
+
+<!-- 6. Shell & Fixers -->
+<script src="app-shell.js"></script>
+<script src="panel-fixer.js"></script>
+
+</body>
+</html>

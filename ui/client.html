@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Grand Luxury Hotel — 360° Virtual Tour</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    background: #08080c; color: #fff;
+    -webkit-tap-highlight-color: transparent;
+}
+#canvas-container { position: fixed; top:0; left:0; width:100%; height:100%; cursor:grab; z-index:1; }
+#canvas-container.dragging { cursor: grabbing; }
+#canvas-container canvas { display:block; width:100% !important; height:100% !important; }
+
+#loader {
+    position: fixed; inset: 0; z-index: 500;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: #08080c; transition: opacity .5s ease;
+}
+#loader.hide { opacity: 0; pointer-events: none; }
+.ring {
+    width: 44px; height: 44px; border-radius: 50%;
+    border: 3px solid rgba(243,156,18,.25); border-top-color: #f39c12;
+    animation: spin .9s linear infinite; margin-bottom: 14px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+#loader span { font-size: 12px; letter-spacing: 2px; color: #f39c12; text-transform: uppercase; }
+
+.hotel-overlay {
+    position: absolute; top: 20px; left: 20px;
+    background: rgba(10,10,14,.72);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    padding: 20px; border-radius: 14px; z-index: 10;
+    max-width: 320px; border: 1px solid rgba(255,255,255,.12);
+    box-shadow: 0 10px 40px rgba(0,0,0,.5);
+}
+.hotel-overlay h2 { font-size: 20px; margin-bottom: 6px; color: #f39c12; letter-spacing: .3px; }
+.hotel-overlay p { font-size: 12.5px; color: #b9b9c0; margin-bottom: 14px; line-height: 1.5; }
+.price { font-size: 19px; font-weight: 700; color: #2ecc71; margin-bottom: 14px; }
+
+.tour-btn {
+    background: #ffffff; color: #17171c; border: none;
+    padding: 12px 20px; border-radius: 30px;
+    font-weight: 600; font-size: 13px; cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0,0,0,.35);
+    transition: transform .18s ease, background .18s ease, color .18s ease;
+    white-space: nowrap;
+    display: inline-flex; align-items: center; justify-content: center;
+}
+.tour-btn:hover { background: #f39c12; color: #fff; transform: translateY(-2px); }
+.tour-btn:active { transform: translateY(0); }
+
+.viewpoint-select {
+    background: rgba(255,255,255,.92);
+    color: #17171c;
+    padding: 12px 40px 12px 20px;
+    border-radius: 30px;
+    font-size: 13px;
+    font-weight: 600;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0,0,0,.35);
+    backdrop-filter: blur(8px);
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat; background-position: right 15px center; background-size: 16px;
+    transition: background .18s ease;
+}
+.viewpoint-select:hover { background-color: #f39c12; color: #fff; }
+.viewpoint-select optgroup { font-weight: bold; color: #888; background: #fff; }
+.viewpoint-select option { font-weight: normal; color: #000; background: #fff; padding: 8px; }
+
+.tour-controls {
+    position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 10px; z-index: 10; flex-wrap: wrap; justify-content: center;
+    padding: 0 12px; max-width: 100vw;
+}
+.tour-controls .tour-btn { backdrop-filter: blur(8px); background: rgba(255,255,255,.92); }
+
+#toast {
+    position: absolute; bottom: 92px; left: 50%; transform: translate(-50%, 16px);
+    background: rgba(16,16,20,.94); color: #fff; border: 1px solid rgba(243,156,18,.5);
+    padding: 11px 22px; border-radius: 30px; font-size: 12.5px; font-weight: 600;
+    opacity: 0; pointer-events: none; transition: opacity .3s, transform .3s; z-index: 200;
+    backdrop-filter: blur(10px);
+}
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+#hint {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    font-size: 13px; color: rgba(255,255,255,.8); letter-spacing: 1px;
+    text-align: center; pointer-events: none; z-index: 5;
+    animation: hintFade 4.5s ease forwards; text-shadow: 0 2px 12px #000;
+}
+@keyframes hintFade { 0%{opacity:0;} 12%{opacity:1;} 70%{opacity:1;} 100%{opacity:0;} }
+
+#vrButton {
+    position: fixed; right: 20px; bottom: 20px; z-index: 120;
+    padding: 13px 24px; border-radius: 30px;
+    font-size: 12px; font-weight: 700; letter-spacing: .6px;
+    border: 1px solid rgba(243,156,18,.7);
+    background: rgba(10,10,14,.85); color: #f39c12;
+    backdrop-filter: blur(8px); cursor: pointer;
+    transition: background .2s, color .2s;
+    display: none;
+}
+#vrButton:hover { background: #f39c12; color: #111; }
+
+/* Feedback modal */
+.modal-overlay {
+    position: fixed; inset: 0; z-index: 300;
+    background: rgba(0,0,0,.75);
+    display: none; align-items: center; justify-content: center;
+    backdrop-filter: blur(6px);
+}
+.modal-overlay.show { display: flex; }
+.modal {
+    background: #17171c; color: #fff;
+    border-radius: 14px; padding: 24px;
+    width: 92%; max-width: 420px;
+    border: 1px solid rgba(243,156,18,.4);
+    box-shadow: 0 20px 60px rgba(0,0,0,.6);
+}
+.modal h3 { color: #f39c12; margin-bottom: 16px; font-size: 17px; }
+.modal label { display:block; font-size: 11px; color:#9a9aa5; margin: 8px 0 4px; text-transform: uppercase; letter-spacing: .5px; }
+.modal input, .modal textarea {
+    width: 100%; padding: 11px; margin-bottom: 4px;
+    background: #1d1d24; border: 1px solid #33333d;
+    color: #fff; border-radius: 8px; font-size: 13px;
+    font-family: inherit;
+}
+.modal textarea { min-height: 90px; resize: vertical; }
+.stars { display: flex; gap: 6px; margin: 6px 0 14px; }
+.stars span {
+    font-size: 26px; cursor: pointer;
+    color: #3a3a44; transition: color .15s;
+    user-select: none;
+}
+.stars span.active { color: #f39c12; }
+.modal .actions { display: flex; gap: 10px; margin-top: 12px; }
+.modal .actions button { flex: 1; padding: 11px; border-radius: 30px; border: none; font-weight: 600; font-size: 13px; cursor: pointer; }
+.modal .actions .cancel { background: #2a2a33; color: #cfcfd6; }
+.modal .actions .submit { background: #2ecc71; color: #fff; }
+.modal .actions .submit:disabled { opacity: .6; cursor: wait; }
+.modal .status { font-size: 12px; margin-top: 10px; text-align: center; }
+.modal .status.ok { color: #2ecc71; }
+.modal .status.err { color: #e74c3c; }
+
+@media (max-width: 620px) {
+    .hotel-overlay { max-width: calc(100vw - 40px); padding: 15px; }
+    .hotel-overlay h2 { font-size: 17px; }
+    .tour-controls { bottom: 16px; gap: 8px; }
+    .tour-controls .tour-btn, .viewpoint-select { padding: 10px 15px; font-size: 11.5px; }
+    .viewpoint-select { padding-right: 30px; background-position: right 10px center; }
+    #vrButton { bottom: 82px; right: 50%; transform: translateX(50%); }
+}
+</style>
+</head>
+<body>
+
+<div class="hotel-overlay" id="hotelCard">
+    <h2 id="roomTitle">Luxury Hotel Suite</h2>
+    <p id="roomDesc">Explore the room in full 360°. Drag to look around, pinch or scroll to zoom, or step inside with a VR headset.</p>
+    <div class="price" id="roomPrice">$180 / Night</div>
+    <button class="tour-btn" id="bookBtn" style="width:100%; background:#2ecc71; color:#fff; padding:11px; margin-bottom:8px;">Book Suite Now</button>
+    <button class="tour-btn" id="feedbackBtn" style="width:100%; background:#2a2a33; color:#f39c12; padding:10px; font-size:12px; border:1px solid rgba(243,156,18,.4);">💬 Leave Feedback</button>
+</div>
+
+<div class="tour-controls">
+    <select id="viewpointSelect" class="viewpoint-select" onchange="setViewpoint(this.value)">
+        <optgroup label="Eye Level Views">
+            <option value="center">📍 Center (Eye Level)</option>
+            <option value="corner-1">📐 Corner 1 (Front Left)</option>
+            <option value="corner-2">📐 Corner 2 (Front Right)</option>
+            <option value="corner-3">📐 Corner 3 (Back Right)</option>
+            <option value="corner-4">📐 Corner 4 (Back Left)</option>
+        </optgroup>
+        <optgroup label="Elevated Views">
+            <option value="center-high">⬆️ Center High (Bird's Eye)</option>
+            <option value="upper-corner-1">📐 Upper Corner 1</option>
+            <option value="upper-corner-2">📐 Upper Corner 2</option>
+            <option value="upper-corner-3">📐 Upper Corner 3</option>
+            <option value="upper-corner-4">📐 Upper Corner 4</option>
+        </optgroup>
+        <optgroup label="Wall Views">
+            <option value="wall-north">🧱 Middle of North Wall</option>
+            <option value="wall-south">🧱 Middle of South Wall</option>
+            <option value="wall-east">🧱 Middle of East Wall</option>
+            <option value="wall-west">🧱 Middle of West Wall</option>
+        </optgroup>
+    </select>
+    <button class="tour-btn" id="gyroBtn" onclick="toggleGyro()">📱 Enable Phone Gyro</button>
+    <button class="tour-btn" onclick="resetView()">🎯 Reset View</button>
+</div>
+
+<div id="toast"></div>
+<div id="hint">DRAG TO LOOK AROUND</div>
+<div id="canvas-container"></div>
+
+<div id="loader">
+    <div class="ring"></div>
+    <span>Loading Suite</span>
+</div>
+
+<!-- Feedback modal -->
+<div class="modal-overlay" id="feedbackModal">
+    <div class="modal">
+        <h3>💬 Share Your Experience</h3>
+        <label>Name (optional)</label>
+        <input id="fbName" placeholder="Your name" />
+        <label>Email (optional)</label>
+        <input id="fbEmail" type="email" placeholder="you@example.com" />
+        <label>Your feedback</label>
+        <textarea id="fbMessage" placeholder="Tell us what you think…"></textarea>
+        <label>Rating (optional)</label>
+        <div class="stars" id="starRating">
+            <span data-v="1">★</span><span data-v="2">★</span><span data-v="3">★</span><span data-v="4">★</span><span data-v="5">★</span>
+        </div>
+        <div class="actions">
+            <button class="cancel" onclick="closeFeedback()">Cancel</button>
+            <button class="submit" id="fbSubmit">Submit</button>
+        </div>
+        <div class="status" id="fbStatus"></div>
+    </div>
+</div>
+
+<script>
+(function () {
+'use strict';
+
+/* =========================================================
+   SUPABASE CONFIG — replace with your project credentials
+   ========================================================= */
+const SUPABASE_URL      = 'https://iflufnduthjzhneahnrf.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_A4oOeh21FiTQN0k_5OvUOg_8F3fMFZs';
+
+let sb = null;
+try {
+    if (SUPABASE_URL.startsWith('http')) {
+        sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } else {
+        console.warn('[360] Supabase not configured — using default room');
+    }
+} catch (e) { console.warn('[360] Supabase init failed:', e); }
+
+/* Analytics state */
+const sessionId = (crypto.randomUUID && crypto.randomUUID()) ||
+    ('sess-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10));
+let activeRoomId = null;
+let viewStartTime = Date.now();
+let lastReportedTime = 0;
+
+/* =========================================================
+   SAFETY
+   ========================================================= */
+function hideLoader() {
+    const l = document.getElementById('loader');
+    if (l) l.classList.add('hide');
+}
+function showFatal(msg) {
+    console.error('[360]', msg);
+    const l = document.getElementById('loader');
+    if (!l) return;
+    l.classList.remove('hide');
+    l.innerHTML =
+        '<div style="max-width:440px;padding:24px;text-align:center;">' +
+        '<div style="font-size:34px;margin-bottom:12px;">⚠️</div>' +
+        '<h3 style="color:#e74c3c;font-size:15px;margin-bottom:10px;">Could not start the tour</h3>' +
+        '<p style="font-size:12.5px;color:#9a9aa5;line-height:1.7;">' + msg + '</p>' +
+        '</div>';
+}
+window.addEventListener('error', e => { if (e && e.message) showFatal(e.message); });
+window.addEventListener('unhandledrejection', e => {
+    showFatal('Unexpected error: ' + (e.reason && e.reason.message ? e.reason.message : e.reason));
+});
+setTimeout(hideLoader, 8000);
+
+/* =========================================================
+   CONSTANTS
+   ========================================================= */
+const DEFAULT_ROOM = { width: 10, height: 8, depth: 10 };
+const EYE_HEIGHT = 2.0;
+const MAX_PITCH = 85 * Math.PI / 180;
+const MIN_FOV = 25;
+const MAX_FOV = 100;
+const LOOK_DAMP = 0.18;
+const INERTIA = 0.94;
+const INERTIA_MUL = 0.55;
+const GYRO_SMOOTH_RATE = 30;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+/* =========================================================
+   STATE
+   ========================================================= */
+let scene, camera, renderer, clock;
+let roomGroup = null;
+
+let lon = 0, lat = 0;
+let targetLon = 0, targetLat = 0;
+let inertiaX = 0, inertiaY = 0;
+let fov = 75, targetFov = 75;
+
+const pointers = new Map();
+let isDragging = false;
+let lastX = 0, lastY = 0;
+let pinchStartDist = 0, pinchStartFov = 75;
+
+let gyroActive = false;
+let gyroInitialized = false;
+let gyroRawCount = 0;
+let gyroEventName = null;
+let gyroFailTimer = null;
+let xrActive = false;
+let xrSession = null;
+let rafId = null;
+
+const _zee = new THREE.Vector3(0, 0, 1);
+const _euler = new THREE.Euler();
+const _q0 = new THREE.Quaternion();
+const _q1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5));
+const _targetQuat = new THREE.Quaternion();
+const _dir = new THREE.Vector3();
+
+/* =========================================================
+   ANALYTICS
+   ========================================================= */
+async function trackEvent(eventType, extra = {}) {
+    if (!sb || !activeRoomId) return;
+    try {
+        await sb.from('analytics_events').insert({
+            room_id: activeRoomId,
+            event_type: eventType,
+            metadata: Object.assign({ session_id: sessionId, ua: navigator.userAgent }, extra)
+        });
+    } catch (e) { console.warn('[360] trackEvent failed:', e); }
+}
+
+async function reportTimeSpent() {
+    if (!sb || !activeRoomId) return;
+    const total = Math.round((Date.now() - viewStartTime) / 1000);
+    const delta = total - lastReportedTime;
+    if (delta < 5) return;
+    lastReportedTime = total;
+    try {
+        await sb.from('analytics_events').insert({
+            room_id: activeRoomId,
+            event_type: 'time_spent',
+            duration_seconds: delta,
+            metadata: { session_id: sessionId }
+        });
+    } catch (e) { /* ignore */ }
+}
+
+setInterval(reportTimeSpent, 30000);
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') reportTimeSpent();
+});
+window.addEventListener('pagehide', reportTimeSpent);
+
+/* =========================================================
+   INIT
+   ========================================================= */
+async function init() {
+    if (typeof THREE === 'undefined') {
+        showFatal('The 3D engine (three.js) could not be loaded. Check your internet connection and reload.');
+        return;
+    }
+    console.log('[360] THREE r' + THREE.REVISION);
+
+    clock = new THREE.Clock();
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x08080c);
+
+    camera = new THREE.PerspectiveCamera(75, (window.innerWidth || 1) / (window.innerHeight || 1), 0.05, 500);
+    camera.rotation.order = 'YXZ';
+    camera.position.set(0, EYE_HEIGHT, 0);
+    camera.rotation.set(0, 0, 0);
+
+    const container = document.getElementById('canvas-container');
+
+    try {
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+    } catch (e) {
+        showFatal('WebGL is not available in this browser. Enable hardware acceleration and try again.');
+        return;
+    }
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(window.innerWidth || 1, window.innerHeight || 1);
+    if (THREE.sRGBEncoding !== undefined) renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.xr.enabled = false;
+    container.appendChild(renderer.domElement);
+
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x3a3a4a, 0.9));
+    const key = new THREE.DirectionalLight(0xffffff, 0.6);
+    key.position.set(5, 9, 6); scene.add(key);
+    const fill = new THREE.PointLight(0xffe9c4, 0.4, 45, 2);
+    fill.position.set(0, 6, 0); scene.add(fill);
+
+    bindInput();
+    window.addEventListener('resize', onResize);
+
+    await loadActiveRoom();
+    startLoop();
+    setupVRButton();
+    setupFeedback();
+    setupBooking();
+}
+
+/* =========================================================
+   RENDER LOOP
+   ========================================================= */
+function startLoop() {
+    if (rafId !== null) return;
+    const tick = () => {
+        rafId = requestAnimationFrame(tick);
+        if (xrActive) return;
+        const dt = Math.min(clock.getDelta(), 0.05);
+        if (gyroActive) {
+            if (gyroInitialized) {
+                const k = 1 - Math.exp(-dt * GYRO_SMOOTH_RATE);
+                camera.quaternion.slerp(_targetQuat, k);
+            }
+        } else {
+            updateLook(dt);
+        }
+        renderer.render(scene, camera);
+    };
+    tick();
+}
+
+function updateLook(dt) {
+    const fs = dt * 60;
+    if (!isDragging) {
+        if (Math.abs(inertiaX) > 1e-5 || Math.abs(inertiaY) > 1e-5) {
+            targetLon += inertiaX * fs;
+            targetLat = clamp(targetLat + inertiaY * fs, -MAX_PITCH, MAX_PITCH);
+            const d = Math.pow(INERTIA, fs);
+            inertiaX *= d; inertiaY *= d;
+        } else { inertiaX = inertiaY = 0; }
+    }
+    const k = 1 - Math.pow(1 - LOOK_DAMP, fs);
+    lon += (targetLon - lon) * k;
+    lat += (targetLat - lat) * k;
+    camera.rotation.set(lat, lon, 0);
+    if (Math.abs(targetFov - fov) > 0.01) {
+        fov += (targetFov - fov) * k;
+        camera.fov = fov;
+        camera.updateProjectionMatrix();
+    }
+}
+
+/* =========================================================
+   INPUT
+   ========================================================= */
+function bindInput() {
+    const el = renderer.domElement;
+    const container = document.getElementById('canvas-container');
+    el.style.touchAction = 'none';
+
+    el.addEventListener('pointerdown', e => {
+        if (gyroActive || xrActive) return;
+        try { el.setPointerCapture(e.pointerId); } catch (err) {}
+        pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (pointers.size === 1) {
+            isDragging = true; lastX = e.clientX; lastY = e.clientY;
+            inertiaX = inertiaY = 0;
+            container.classList.add('dragging');
+        } else if (pointers.size === 2) {
+            isDragging = false;
+            const p = [...pointers.values()];
+            pinchStartDist = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+            pinchStartFov = targetFov;
+        }
+    });
+
+    el.addEventListener('pointermove', e => {
+        if (!pointers.has(e.pointerId)) return;
+        pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (pointers.size >= 2) {
+            const p = [...pointers.values()];
+            const d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+            if (pinchStartDist > 0 && d > 0) {
+                targetFov = clamp(pinchStartFov * (pinchStartDist / d), MIN_FOV, MAX_FOV);
+            }
+            return;
+        }
+        if (!isDragging || gyroActive || xrActive) return;
+        const dx = e.clientX - lastX;
+        const dy = e.clientY - lastY;
+        lastX = e.clientX; lastY = e.clientY;
+        const sens = (camera.fov * Math.PI / 180) / window.innerHeight * 1.15;
+        targetLon += dx * sens;
+        targetLat = clamp(targetLat + dy * sens, -MAX_PITCH, MAX_PITCH);
+        inertiaX = dx * sens * INERTIA_MUL;
+        inertiaY = dy * sens * INERTIA_MUL;
+    });
+
+    const end = e => {
+        pointers.delete(e.pointerId);
+        if (pointers.size === 0) {
+            isDragging = false;
+            container.classList.remove('dragging');
+        }
+        if (pointers.size < 2) pinchStartDist = 0;
+    };
+    el.addEventListener('pointerup', end);
+    el.addEventListener('pointercancel', end);
+    el.addEventListener('lostpointercapture', end);
+
+    el.addEventListener('wheel', e => {
+        e.preventDefault();
+        targetFov = clamp(targetFov + e.deltaY * 0.05, MIN_FOV, MAX_FOV);
+    }, { passive: false });
+
+    window.addEventListener('keydown', e => {
+        const s = 6 * Math.PI / 180;
+        switch (e.key) {
+            case 'ArrowLeft':  targetLon -= s; break;
+            case 'ArrowRight': targetLon += s; break;
+            case 'ArrowUp':    targetLat = clamp(targetLat + s, -MAX_PITCH, MAX_PITCH); break;
+            case 'ArrowDown':  targetLat = clamp(targetLat - s, -MAX_PITCH, MAX_PITCH); break;
+            case '+': case '=': targetFov = clamp(targetFov - 3, MIN_FOV, MAX_FOV); break;
+            case '-': case '_': targetFov = clamp(targetFov + 3, MIN_FOV, MAX_FOV); break;
+            case 'r': case 'R': resetView(); break;
+            default: return;
+        }
+        e.preventDefault();
+    });
+}
+
+/* =========================================================
+   ROOM BUILD
+   ========================================================= */
+function buildRoom(data) {
+    data = data || {};
+    if (roomGroup) { scene.remove(roomGroup); disposeObject(roomGroup); roomGroup = null; }
+    roomGroup = new THREE.Group();
+
+    const size = Object.assign({}, DEFAULT_ROOM, data.roomSize || {});
+    const W = Number(size.width)  || DEFAULT_ROOM.width;
+    const H = Number(size.height) || DEFAULT_ROOM.height;
+    const D = Number(size.depth)  || DEFAULT_ROOM.depth;
+    const walls = Array.isArray(data.wallImages) ? data.wallImages : [];
+
+    const matBack  = makeRoomMaterial(walls[0],       0xE8DCC8);
+    const matLeft  = makeRoomMaterial(walls[1],       0xC8D8E8);
+    const matRight = makeRoomMaterial(walls[2],       0xE8D4B8);
+    const matFront = makeRoomMaterial(walls[3],       0xD8D8DC);
+    const matFloor = makeRoomMaterial(data.baseImage, 0x6B4A2F);
+    const matRoof  = makeRoomMaterial(data.roofImage, 0xF0F0F5);
+
+    addPlane(roomGroup, W, H, matBack,  [0, H / 2, -D / 2], [0, 0, 0]);
+    addPlane(roomGroup, W, H, matFront, [0, H / 2,  D / 2], [0, Math.PI, 0]);
+    addPlane(roomGroup, D, H, matLeft,  [-W / 2, H / 2, 0], [0,  Math.PI / 2, 0]);
+    addPlane(roomGroup, D, H, matRight, [ W / 2, H / 2, 0], [0, -Math.PI / 2, 0]);
+    addPlane(roomGroup, W, D, matFloor, [0, 0, 0], [-Math.PI / 2, 0, 0]);
+    addPlane(roomGroup, W, D, matRoof,  [0, H, 0], [ Math.PI / 2, 0, 0]);
+
+    if (Array.isArray(data.components)) {
+        data.components.forEach(c => {
+            const o = buildComponent(c);
+            if (o) roomGroup.add(o);
+        });
+    }
+    scene.add(roomGroup);
+
+    if (Array.isArray(data.lights)) {
+        data.lights.forEach(ld => {
+            if (!ld || !ld.type) return;
+            const col = ld.color || '#ffffff';
+            const int = ld.intensity || 1;
+            let L;
+            switch (ld.type) {
+                case 'point':       L = new THREE.PointLight(col, int, ld.distance || 0, 2); break;
+                case 'spot':        L = new THREE.SpotLight(col, int, ld.distance || 0, Math.PI / 6, 0.4, 2); break;
+                case 'directional': L = new THREE.DirectionalLight(col, int); break;
+                case 'ambient':     L = new THREE.AmbientLight(col, int); break;
+                default: return;
+            }
+            if (ld.position && L.position) {
+                L.position.set(ld.position[0], ld.position[1], ld.position[2]);
+                if (L.target) { L.target.position.set(0, 0, 0); scene.add(L.target); }
+            }
+            scene.add(L);
+        });
+    }
+
+    if (data.roomName) document.getElementById('roomTitle').textContent = data.roomName;
+    if (data.price)    document.getElementById('roomPrice').textContent = data.price;
+    if (data.description) document.getElementById('roomDesc').textContent = data.description;
+}
+
+function makeRoomMaterial(url, fallback) {
+    const mat = new THREE.MeshBasicMaterial({ color: fallback, side: THREE.DoubleSide });
+    if (url) {
+        try {
+            new THREE.TextureLoader().load(url, tex => {
+                if (THREE.sRGBEncoding !== undefined) tex.encoding = THREE.sRGBEncoding;
+                try { tex.anisotropy = renderer.capabilities.getMaxAnisotropy(); } catch (e) {}
+                tex.minFilter = THREE.LinearFilter;
+                tex.magFilter = THREE.LinearFilter;
+                tex.generateMipmaps = false;
+                tex.needsUpdate = true;
+                mat.map = tex;
+                mat.color.setHex(0xffffff);
+                mat.needsUpdate = true;
+            }, undefined, () => {});
+        } catch (e) {}
+    }
+    return mat;
+}
+
+function addPlane(parent, w, h, mat, pos, rot) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+    m.position.set(pos[0], pos[1], pos[2]);
+    m.rotation.set(rot[0], rot[1], rot[2]);
+    parent.add(m);
+    return m;
+}
+
+/* =========================================================
+   CUSTOM MODEL / COMPONENT BUILD
+   ========================================================= */
+function buildFromTree(node) {
+    if (!node) return null;
+    let obj;
+    if (node.isMesh && node.geometry) {
+        const geo = deserializeGeometry(node.geometry);
+        obj = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({
+            color: (node.material && node.material.color) || 0xcccccc,
+            side: THREE.DoubleSide
+        }));
+        if (node.material && node.material.map) {
+            new THREE.TextureLoader().load(node.material.map, tex => {
+                if (THREE.sRGBEncoding !== undefined) tex.encoding = THREE.sRGBEncoding;
+                tex.flipY = false;
+                obj.material.map = tex;
+                obj.material.color.setHex(0xffffff);
+                obj.material.needsUpdate = true;
+            });
+        }
+    } else {
+        obj = new THREE.Group();
+    }
+    if (node.position)   obj.position.set(node.position[0], node.position[1], node.position[2]);
+    if (node.quaternion) obj.quaternion.set(node.quaternion[0], node.quaternion[1], node.quaternion[2], node.quaternion[3]);
+    if (node.scale)      obj.scale.set(node.scale[0], node.scale[1], node.scale[2]);
+    obj.visible = node.visible !== false;
+    if (Array.isArray(node.children)) {
+        node.children.forEach(ch => {
+            const k = buildFromTree(ch);
+            if (k) obj.add(k);
+        });
+    }
+    return obj;
+}
+
+function deserializeGeometry(data) {
+    const g = new THREE.BufferGeometry();
+    if (!data || !data.positions || !data.positions.length) return g;
+    g.setAttribute('position', new THREE.Float32BufferAttribute(data.positions, 3));
+    if (data.normals && data.normals.length) g.setAttribute('normal', new THREE.Float32BufferAttribute(data.normals, 3));
+    if (data.uvs     && data.uvs.length)     g.setAttribute('uv',     new THREE.Float32BufferAttribute(data.uvs, 2));
+    if (data.index   && data.index.length) {
+        g.setIndex(data.index.length > 65535
+            ? new THREE.Uint32BufferAttribute(data.index, 1)
+            : new THREE.Uint16BufferAttribute(data.index, 1));
+    }
+    if (!data.normals || !data.normals.length) g.computeVertexNormals();
+    return g;
+}
+
+function buildComponent(c) {
+    if (!c) return null;
+    if (c.type === 'custom' && c.tree) {
+        const obj = buildFromTree(c.tree);
+        if (c.visible === false && obj) obj.visible = false;
+        return obj;
+    }
+    if (!c.type) return null;
+    let obj;
+    switch (c.type) {
+        case 'chair':     obj = createChair();     break;
+        case 'table':     obj = createTable();     break;
+        case 'sofa':      obj = createSofa();      break;
+        case 'bed':       obj = createBed();       break;
+        case 'lamp':      obj = createLamp();      break;
+        case 'plant':     obj = createPlant();     break;
+        case 'bookshelf': obj = createBookshelf(); break;
+        case 'tv':        obj = createTV();        break;
+        case 'rug':       obj = createRug();       break;
+        case 'sphere':    obj = createSphere();    break;
+        case 'cylinder':  obj = createCylinder();  break;
+        case 'cone':      obj = createCone();      break;
+        case 'torus':     obj = createTorus();     break;
+        default:          obj = createCube();
+    }
+    const p = c.position || [0, 0, 0];
+    const r = c.rotation || [0, 0, 0];
+    const s = c.scale    || [1, 1, 1];
+    obj.position.set(p[0], p[1], p[2]);
+    obj.rotation.set(r[0], r[1], r[2]);
+    obj.scale.set(s[0], s[1], s[2]);
+    if (c.visible === false) obj.visible = false;
+    if (Array.isArray(c.meshColors) && c.meshColors.length) {
+        let i = 0;
+        obj.traverse(ch => {
+            if (ch.isMesh && ch.material && ch.material.color) {
+                const col = c.meshColors[i++];
+                if (col) { try { ch.material.color.set(col); ch.material.needsUpdate = true; } catch (e) {} }
+            }
+        });
+    } else if (c.color) {
+        try {
+            const col = new THREE.Color(c.color);
+            obj.traverse(ch => {
+                if (ch.isMesh && ch.material && ch.material.color) {
+                    ch.material.color.copy(col);
+                    ch.material.needsUpdate = true;
+                }
+            });
+        } catch (e) {}
+    }
+    return obj;
+}
+
+function createChair() {
+    const g = new THREE.Group();
+    const lm = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+    for (let i = 0; i < 4; i++) {
+        const l = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.8, 8), lm);
+        l.position.set(i % 2 === 0 ? -0.4 : 0.4, 0.9, i < 2 ? -0.4 : 0.4);
+        g.add(l);
+    }
+    const sm = new THREE.MeshLambertMaterial({ color: 0x654321 });
+    const s = new THREE.Mesh(new THREE.BoxGeometry(1, 0.1, 1), sm);
+    s.position.y = 1.85; g.add(s);
+    const b = new THREE.Mesh(new THREE.BoxGeometry(1, 1.5, 0.1), sm);
+    b.position.set(0, 2.6, -0.45); g.add(b);
+    return g;
+}
+function createTable() {
+    const g = new THREE.Group();
+    const lm = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+    for (let i = 0; i < 4; i++) {
+        const l = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.2, 8), lm);
+        l.position.set(i % 2 === 0 ? -0.8 : 0.8, 1.1, i < 2 ? -0.5 : 0.5);
+        g.add(l);
+    }
+    const t = new THREE.Mesh(new THREE.BoxGeometry(2, 0.1, 1.2),
+        new THREE.MeshLambertMaterial({ color: 0xDEB887 }));
+    t.position.y = 2.2; g.add(t);
+    return g;
+}
+function createSofa() {
+    const g = new THREE.Group();
+    const m = new THREE.MeshLambertMaterial({ color: 0x8B0000 });
+    const b = new THREE.Mesh(new THREE.BoxGeometry(2.5, 1, 0.8), m);
+    b.position.y = 0.5; g.add(b);
+    const bk = new THREE.Mesh(new THREE.BoxGeometry(2.5, 1.2, 0.1), m);
+    bk.position.set(0, 1.1, -0.35); g.add(bk);
+    const ag = new THREE.BoxGeometry(0.2, 0.8, 0.8);
+    const l = new THREE.Mesh(ag, m); l.position.set(-1.15, 0.9, 0); g.add(l);
+    const r = new THREE.Mesh(ag, m); r.position.set( 1.15, 0.9, 0); g.add(r);
+    return g;
+}
+function createBed() {
+    const g = new THREE.Group();
+    const m = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.4, 1.8),
+        new THREE.MeshLambertMaterial({ color: 0xFFFFFF }));
+    m.position.y = 0.2; g.add(m);
+    const pm = new THREE.MeshLambertMaterial({ color: 0x87CEEB });
+    const p1 = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.15, 0.4), pm);
+    p1.position.set( 0.5, 0.4, 0.6); g.add(p1);
+    const p2 = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.15, 0.4), pm);
+    p2.position.set(-0.5, 0.4, 0.6); g.add(p2);
+    return g;
+}
+function createLamp() {
+    const g = new THREE.Group();
+    const b = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 0.1, 16),
+        new THREE.MeshLambertMaterial({ color: 0x333333 }));
+    b.position.y = 0.05; g.add(b);
+    const p = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.8, 8),
+        new THREE.MeshLambertMaterial({ color: 0x666666 }));
+    p.position.y = 1; g.add(p);
+    const s = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.6, 16),
+        new THREE.MeshLambertMaterial({ color: 0xFFFFAA }));
+    s.position.y = 1.9; s.rotation.x = Math.PI; g.add(s);
+    return g;
+}
+function createPlant() {
+    const g = new THREE.Group();
+    const p = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.2, 0.4, 16),
+        new THREE.MeshLambertMaterial({ color: 0x8B4513 }));
+    p.position.y = 0.2; g.add(p);
+    const l = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6),
+        new THREE.MeshLambertMaterial({ color: 0x228B22 }));
+    l.position.y = 0.8; l.scale.set(1, 1.5, 1); g.add(l);
+    return g;
+}
+function createBookshelf() {
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.2, 0.4),
+        new THREE.MeshLambertMaterial({ color: 0x8B4513 })));
+    const sm = new THREE.MeshLambertMaterial({ color: 0xA0522D });
+    for (let i = 0; i < 4; i++) {
+        const s = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.05, 0.35), sm);
+        s.position.y = -0.8 + i * 0.7; g.add(s);
+    }
+    return g;
+}
+function createTV() {
+    const g = new THREE.Group();
+    const s = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.9, 0.05),
+        new THREE.MeshLambertMaterial({ color: 0x000000 }));
+    s.position.y = 0.9; g.add(s);
+    const st = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.1, 0.2),
+        new THREE.MeshLambertMaterial({ color: 0x333333 }));
+    st.position.y = 0.45; g.add(st);
+    g.add(new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.05, 0.4),
+        new THREE.MeshLambertMaterial({ color: 0x666666 })));
+    return g;
+}
+function createRug() {
+    const r = new THREE.Mesh(
+        new THREE.PlaneGeometry(2.5, 1.5),
+        new THREE.MeshLambertMaterial({ color: 0x800000, side: THREE.DoubleSide })
+    );
+    r.rotation.x = -Math.PI / 2;
+    return r;
+}
+function createCube()     { return new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1),            new THREE.MeshLambertMaterial({ color: 0x9a9aa5 })); }
+function createSphere()   { return new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 12),     new THREE.MeshLambertMaterial({ color: 0x9a9aa5 })); }
+function createCylinder() { return new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1, 16), new THREE.MeshLambertMaterial({ color: 0x9a9aa5 })); }
+function createCone()     { return new THREE.Mesh(new THREE.ConeGeometry(0.5, 1, 16),          new THREE.MeshLambertMaterial({ color: 0x9a9aa5 })); }
+function createTorus()    { return new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.2, 12, 24),  new THREE.MeshLambertMaterial({ color: 0x9a9aa5 })); }
+
+/* =========================================================
+   LOAD ACTIVE ROOM FROM SUPABASE
+   ========================================================= */
+async function loadActiveRoom() {
+    if (!sb) { buildRoom({}); trackEvent('view', { source: 'fallback' }); return; }
+    try {
+        const { data, error } = await sb
+            .from('rooms')
+            .select('*')
+            .eq('is_active', true)
+            .maybeSingle();
+        if (error) throw error;
+
+        if (data) {
+            activeRoomId = data.id;
+            const cfg = Object.assign({}, data.config || {});
+            cfg.roomName    = data.room_name || cfg.roomName;
+            cfg.price       = data.price     || cfg.price;
+            cfg.description = data.description || cfg.description;
+            buildRoom(cfg);
+            document.getElementById('roomDesc').textContent = cfg.description;
+            trackEvent('view', { source: 'supabase' });
+        } else {
+            console.warn('[360] No active room in Supabase — showing default');
+            buildRoom({});
+            trackEvent('view', { source: 'default' });
+        }
+    } catch (e) {
+        console.warn('[360] Failed to load room from Supabase:', e);
+        buildRoom({});
+        trackEvent('view', { source: 'error' });
+    }
+}
+
+/* =========================================================
+   BOOKING + FEEDBACK
+   ========================================================= */
+function setupBooking() {
+    const btn = document.getElementById('bookBtn');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        trackEvent('booking_click', {});
+        toast('Redirecting to booking checkout...');
+        setTimeout(() => alert('Redirecting to booking checkout...'), 250);
+    });
+}
+
+function setupFeedback() {
+    const openBtn = document.getElementById('feedbackBtn');
+    const modal = document.getElementById('feedbackModal');
+    const closeBtn = modal.querySelector('.cancel');
+    const submitBtn = document.getElementById('fbSubmit');
+    const statusEl = document.getElementById('fbStatus');
+
+    openBtn.addEventListener('click', () => {
+        modal.classList.add('show');
+        statusEl.textContent = '';
+        statusEl.className = 'status';
+    });
+
+    function close() {
+        modal.classList.remove('show');
+        document.getElementById('fbName').value = '';
+        document.getElementById('fbEmail').value = '';
+        document.getElementById('fbMessage').value = '';
+        selectedRating = 0;
+        stars.forEach(x => x.classList.remove('active'));
+    }
+    window.closeFeedback = close;
+    closeBtn.addEventListener('click', close);
+    modal.addEventListener('click', e => { if (e.target === modal) close(); });
+
+    stars.forEach(s => {
+        s.addEventListener('click', () => {
+            selectedRating = parseInt(s.dataset.v, 10);
+            stars.forEach(x => x.classList.toggle('active', parseInt(x.dataset.v, 10) <= selectedRating));
+        });
+    });
+
+    submitBtn.addEventListener('click', async () => {
+        const message = document.getElementById('fbMessage').value.trim();
+        if (!message) {
+            statusEl.textContent = 'Please write your feedback first.';
+            statusEl.className = 'status err';
+            return;
+        }
+        if (!sb) {
+            statusEl.textContent = 'Feedback service unavailable.';
+            statusEl.className = 'status err';
+            return;
+        }
+        submitBtn.disabled = true;
+        statusEl.textContent = 'Sending…';
+        statusEl.className = 'status';
+        try {
+            const { error } = await sb.from('feedback').insert({
+                room_id: activeRoomId,
+                name: document.getElementById('fbName').value.trim() || null,
+                email: document.getElementById('fbEmail').value.trim() || null,
+                message: message,
+                rating: selectedRating || null
+            });
+            if (error) throw error;
+            statusEl.textContent = '✓ Thank you for your feedback!';
+            statusEl.className = 'status ok';
+            setTimeout(close, 1400);
+        } catch (e) {
+            console.error(e);
+            statusEl.textContent = 'Could not send. Try again.';
+            statusEl.className = 'status err';
+        } finally {
+            submitBtn.disabled = false;
+        }
+    });
+}
+
+let selectedRating = 0;
+const stars = document.querySelectorAll('#starRating span');
+
+/* =========================================================
+   GYRO
+   ========================================================= */
+function toggleGyro() {
+    if (gyroActive) { disableGyro(); return; }
+    const start = () => enableGyro();
+    if (typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function') {
+        DeviceOrientationEvent.requestPermission()
+            .then(r => {
+                if (r === 'granted') start();
+                else alert('Motion permission denied.\n\nEnable it in Settings → Safari → Motion & Orientation Access.');
+            })
+            .catch(err => {
+                console.error('[360] gyro permission error', err);
+                alert('Could not access motion sensors: ' + (err && err.message ? err.message : err));
+            });
+    } else if (typeof DeviceOrientationEvent !== 'undefined') {
+        start();
+    } else {
+        alert('This device does not support motion controls.');
+    }
+}
+function enableGyro() {
+    let eventName = 'deviceorientation';
+    if ('ondeviceorientationabsolute' in window) eventName = 'deviceorientationabsolute';
+    gyroEventName = eventName;
+    gyroRawCount = 0;
+    gyroInitialized = false;
+    window.addEventListener(eventName, onDeviceOrientation, true);
+    if (eventName === 'deviceorientationabsolute') {
+        window.addEventListener('deviceorientation', onDeviceOrientation, true);
+    }
+    gyroActive = true;
+    document.getElementById('gyroBtn').textContent = '📱 Disable Phone Gyro';
+    toast('Move your phone to look around');
+    clearTimeout(gyroFailTimer);
+    gyroFailTimer = setTimeout(() => {
+        if (gyroActive && gyroRawCount === 0) {
+            toast('⚠️ No motion data — check HTTPS & motion permissions');
+        }
+    }, 2500);
+}
+function disableGyro() {
+    if (gyroEventName) {
+        window.removeEventListener(gyroEventName, onDeviceOrientation, true);
+        if (gyroEventName === 'deviceorientationabsolute') {
+            window.removeEventListener('deviceorientation', onDeviceOrientation, true);
+        }
+    }
+    clearTimeout(gyroFailTimer);
+    gyroFailTimer = null;
+    gyroActive = false;
+    gyroInitialized = false;
+    _dir.set(0, 0, -1).applyQuaternion(camera.quaternion);
+    lat = Math.asin(clamp(_dir.y, -1, 1));
+    lon = Math.atan2(-_dir.x, -_dir.z);
+    lat = clamp(lat, -MAX_PITCH, MAX_PITCH);
+    targetLat = lat; targetLon = lon;
+    camera.rotation.set(lat, lon, 0);
+    document.getElementById('gyroBtn').textContent = '📱 Enable Phone Gyro';
+    toast('Gyro disabled');
+}
+function onDeviceOrientation(e) {
+    if (e.alpha == null || e.beta == null || e.gamma == null) return;
+    try {
+        gyroRawCount++;
+        const alpha = e.alpha * Math.PI / 180;
+        const beta  = e.beta  * Math.PI / 180;
+        const gamma = e.gamma * Math.PI / 180;
+        let orient = 0;
+        if (screen.orientation && typeof screen.orientation.angle === 'number') orient = screen.orientation.angle;
+        else if (typeof window.orientation === 'number') orient = window.orientation;
+        orient = orient * Math.PI / 180;
+        _euler.set(beta, alpha, -gamma, 'YXZ');
+        _targetQuat.setFromEuler(_euler);
+        _targetQuat.multiply(_q1);
+        _targetQuat.multiply(_q0.setFromAxisAngle(_zee, -orient));
+        if (!gyroInitialized) {
+            camera.quaternion.copy(_targetQuat);
+            gyroInitialized = true;
+        }
+    } catch (err) { console.warn('[360] gyro handler error:', err); }
+}
+
+/* =========================================================
+   VR
+   ========================================================= */
+function setupVRButton() {
+    if (!navigator.xr || !renderer || !renderer.xr) return;
+    navigator.xr.isSessionSupported('immersive-vr').then(supported => {
+        if (!supported) return;
+        const btn = document.createElement('button');
+        btn.id = 'vrButton';
+        btn.textContent = 'ENTER VR';
+        btn.style.display = 'block';
+        btn.addEventListener('click', async () => {
+            if (xrSession) { try { await xrSession.end(); } catch (e) {} return; }
+            try {
+                const s = await navigator.xr.requestSession('immersive-vr', {
+                    optionalFeatures: ['local-floor', 'bounded-floor']
+                });
+                renderer.xr.enabled = true;
+                await renderer.xr.setSession(s);
+                xrSession = s; xrActive = true;
+                btn.textContent = 'EXIT VR';
+                renderer.setAnimationLoop(() => renderer.render(scene, camera));
+                s.addEventListener('end', () => {
+                    xrSession = null; xrActive = false;
+                    renderer.setAnimationLoop(null);
+                    renderer.xr.enabled = false;
+                    btn.textContent = 'ENTER VR';
+                    camera.fov = fov;
+                    camera.updateProjectionMatrix();
+                    camera.rotation.set(lat, lon, 0);
+                });
+            } catch (err) {
+                console.warn('[360] VR failed', err);
+                renderer.xr.enabled = false;
+            }
+        });
+        document.body.appendChild(btn);
+    }).catch(() => {});
+}
+
+/* =========================================================
+   VIEWPOINTS
+   ========================================================= */
+function setViewpoint(type) {
+    if (gyroActive) disableGyro();
+    const offset = 4;
+    let x = 0, y = EYE_HEIGHT, z = 0;
+    switch (type) {
+        case 'center':        x = 0; y = EYE_HEIGHT; z = 0; break;
+        case 'corner-1':      x = -offset; y = EYE_HEIGHT; z = offset; break;
+        case 'corner-2':      x = offset; y = EYE_HEIGHT; z = offset; break;
+        case 'corner-3':      x = offset; y = EYE_HEIGHT; z = -offset; break;
+        case 'corner-4':      x = -offset; y = EYE_HEIGHT; z = -offset; break;
+        case 'center-high':   x = 0; y = 6.0; z = 0; break;
+        case 'upper-corner-1':x = -offset; y = 6.0; z = offset; break;
+        case 'upper-corner-2':x = offset; y = 6.0; z = offset; break;
+        case 'upper-corner-3':x = offset; y = 6.0; z = -offset; break;
+        case 'upper-corner-4':x = -offset; y = 6.0; z = -offset; break;
+        case 'wall-north':    x = 0; y = EYE_HEIGHT; z = -offset; break;
+        case 'wall-south':    x = 0; y = EYE_HEIGHT; z = offset; break;
+        case 'wall-east':     x = offset; y = EYE_HEIGHT; z = 0; break;
+        case 'wall-west':     x = -offset; y = EYE_HEIGHT; z = 0; break;
+    }
+    camera.position.set(x, y, z);
+    const dx = 0 - x, dy = 1.5 - y, dz = 0 - z;
+    const distXZ = Math.hypot(dx, dz);
+    targetLon = Math.atan2(-dx, -dz);
+    targetLat = Math.atan2(dy, distXZ);
+    targetLat = clamp(targetLat, -MAX_PITCH, MAX_PITCH);
+    lon = targetLon; lat = targetLat;
+    inertiaX = 0; inertiaY = 0;
+    camera.rotation.set(lat, lon, 0);
+    const select = document.getElementById('viewpointSelect');
+    if (select && select.value !== type) select.value = type;
+}
+
+function resetView() {
+    if (gyroActive) disableGyro();
+    inertiaX = inertiaY = 0;
+    targetFov = fov = 75;
+    camera.fov = 75;
+    camera.updateProjectionMatrix();
+    setViewpoint('corner-1');
+}
+
+function onResize() {
+    if (!renderer || !camera) return;
+    const w = window.innerWidth || 1;
+    const h = window.innerHeight || 1;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h);
+}
+
+function disposeObject(o) {
+    o.traverse(c => {
+        if (c.geometry) c.geometry.dispose();
+        if (c.material) {
+            const ms = Array.isArray(c.material) ? c.material : [c.material];
+            ms.forEach(m => { if (m.map) m.map.dispose(); m.dispose(); });
+        }
+    });
+}
+
+let toastTimer = null;
+function toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 2400);
+}
+
+window.toggleGyro   = toggleGyro;
+window.setViewpoint = setViewpoint;
+window.resetView    = resetView;
+/* NOTE: window.closeFeedback is assigned inside setupFeedback() */
+
+/* =========================================================
+   BOOT
+   ========================================================= */
+async function boot() {
+    try {
+        await init();
+    } catch (err) {
+        console.error('[360] boot error', err);
+        showFatal(err && err.message ? err.message : 'An unexpected error occurred while starting the tour.');
+    } finally {
+        setTimeout(hideLoader, 800);
+    }
+}
+
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    setTimeout(boot, 0);
+} else {
+    window.addEventListener('DOMContentLoaded', boot);
+}
+
+})();
+</script>
+</body>
+</html>

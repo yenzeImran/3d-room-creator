@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Royelle Hotel — Room Details</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<!-- Icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<!-- Supabase -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+:root {
+    --primary: #163a34; /* Dark green from screenshot */
+    --primary-light: #1f4e45;
+    --accent: #c5a880;
+    --text-dark: #2c2c2c;
+    --text-light: #6b6b6b;
+    --bg-light: #f9f9f9;
+    --border: #e5e5e5;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: 'Inter', sans-serif;
+    color: var(--text-dark);
+    background: #fff;
+    line-height: 1.6;
+}
+h1, h2, h3, h4, .serif { font-family: 'Playfair Display', serif; }
+a { text-decoration: none; color: inherit; }
+
+/* Top Bar */
+.topbar {
+    background: var(--primary);
+    color: rgba(255,255,255,0.8);
+    font-size: 11.5px;
+    padding: 8px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 5%;
+}
+.topbar-left { display: flex; gap: 20px; }
+.topbar-left span { display: flex; align-items: center; gap: 6px; }
+.topbar-right a { margin-left: 12px; color: var(--accent); transition: color 0.2s; }
+.topbar-right a:hover { color: #fff; }
+
+/* Navbar */
+nav {
+    padding: 18px 5%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #fff;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+}
+.logo {
+    display: flex; align-items: center; gap: 10px;
+    font-family: 'Playfair Display', serif;
+    font-size: 24px; font-weight: 700; color: var(--primary);
+}
+.logo i { color: var(--accent); font-size: 28px; }
+.nav-links { display: flex; gap: 28px; font-size: 13.5px; font-weight: 500; color: var(--text-dark); }
+.nav-links a:hover { color: var(--accent); }
+.btn-nav {
+    background: var(--primary); color: #fff;
+    padding: 10px 24px; border-radius: 4px;
+    font-size: 13px; font-weight: 600;
+    transition: background 0.2s;
+}
+.btn-nav:hover { background: var(--primary-light); }
+
+/* Hero */
+.hero {
+    background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('https://images.unsplash.com/photo-1611892440504-42a792e24d32?q=80&w=2070&auto=format&fit=crop') center/cover;
+    height: 260px;
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    color: #fff; text-align: center;
+}
+.hero h1 { font-size: 42px; margin-bottom: 8px; font-weight: 600; }
+.breadcrumb { font-size: 13px; display: flex; gap: 8px; align-items: center; }
+.breadcrumb span { color: rgba(255,255,255,0.7); }
+
+/* Main Layout */
+.container { max-width: 1200px; margin: 40px auto; padding: 0 20px; display: grid; grid-template-columns: 2fr 1fr; gap: 40px; }
+
+/* Gallery */
+.gallery { display: flex; gap: 12px; margin-bottom: 30px; }
+.gallery-thumbs { display: flex; flex-direction: column; gap: 12px; width: 100px; }
+.gallery-thumbs img { width: 100%; height: 80px; object-fit: cover; border-radius: 8px; cursor: pointer; opacity: 0.6; transition: opacity 0.3s; }
+.gallery-thumbs img:hover, .gallery-thumbs img.active { opacity: 1; }
+.gallery-main {
+    flex: 1; position: relative; border-radius: 12px; overflow: hidden;
+    height: 380px; background: #eee;
+}
+.gallery-main img { width: 100%; height: 100%; object-fit: cover; }
+.btn-360-overlay {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0.3);
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.3s;
+}
+.btn-360-overlay:hover { background: rgba(0,0,0,0.5); }
+.btn-360-overlay button {
+    background: #fff; color: var(--primary);
+    border: none; padding: 16px 32px; border-radius: 40px;
+    font-size: 15px; font-weight: 700; cursor: pointer;
+    display: flex; align-items: center; gap: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    transition: transform 0.2s;
+}
+.btn-360-overlay button:hover { transform: scale(1.05); }
+
+/* Info Section */
+.room-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 20px; }
+.room-title { font-size: 26px; color: var(--primary); margin-bottom: 4px; display: flex; align-items: center; gap: 12px; }
+.badge { background: rgba(22,58,52,0.1); color: var(--primary); font-family: 'Inter', sans-serif; font-size: 11px; padding: 4px 10px; border-radius: 20px; font-weight: 600; text-transform: uppercase; }
+.rating { color: var(--text-light); font-size: 13px; display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.rating i { color: #f1c40f; }
+.location { font-size: 13px; color: var(--text-light); display: flex; align-items: center; gap: 6px; }
+.price { font-size: 24px; font-weight: 700; color: var(--primary); }
+.price span { font-size: 13px; font-weight: 400; color: var(--text-light); }
+
+/* Specs */
+.specs { display: flex; gap: 24px; margin-bottom: 30px; background: var(--bg-light); padding: 16px 20px; border-radius: 8px; font-size: 13px; color: var(--text-dark); }
+.specs div { display: flex; align-items: center; gap: 8px; }
+.specs i { color: var(--accent); }
+
+/* Content */
+h3.section-title { font-size: 20px; color: var(--primary); margin-bottom: 16px; }
+.desc-text { font-size: 14px; color: var(--text-light); margin-bottom: 30px; line-height: 1.8; }
+
+/* Amenities */
+.amenities-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 40px; }
+.amenity { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-dark); }
+.amenity i { color: var(--primary); background: rgba(22,58,52,0.05); padding: 8px; border-radius: 6px; width: 32px; text-align: center; }
+
+/* Sidebar / Booking */
+.sidebar { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.05); position: sticky; top: 100px; }
+.sidebar h3 { font-size: 20px; margin-bottom: 20px; color: var(--primary); }
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; color: var(--text-dark); }
+.form-group input, .form-group select {
+    width: 100%; padding: 12px; border: 1px solid var(--border);
+    border-radius: 6px; font-family: 'Inter', sans-serif; font-size: 13px;
+    color: var(--text-dark); background: #fff; outline: none;
+}
+.form-group input:focus, .form-group select:focus { border-color: var(--primary); }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.btn-book {
+    width: 100%; padding: 14px; background: var(--primary); color: #fff;
+    border: none; border-radius: 6px; font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: background 0.2s; margin-top: 10px;
+    display: flex; justify-content: center; align-items: center; gap: 8px;
+}
+.btn-book:hover { background: var(--primary-light); }
+.divider { text-align: center; font-size: 12px; color: var(--text-light); margin: 15px 0; position: relative; }
+.divider::before, .divider::after { content: ""; position: absolute; top: 50%; width: 40%; height: 1px; background: var(--border); }
+.divider::before { left: 0; }
+.divider::after { right: 0; }
+.btn-360-sidebar {
+    width: 100%; padding: 14px; background: #fff; color: var(--primary);
+    border: 2px solid var(--primary); border-radius: 6px; font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s; display: flex; justify-content: center; align-items: center; gap: 8px;
+}
+.btn-360-sidebar:hover { background: var(--primary); color: #fff; }
+
+/* Loading State */
+.loading { text-align: center; padding: 100px; color: var(--text-light); }
+
+@media (max-width: 900px) {
+    .container { grid-template-columns: 1fr; }
+    .sidebar { position: static; }
+    .nav-links { display: none; }
+    .topbar { display: none; }
+    .amenities-grid { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<div class="topbar">
+    <div class="topbar-left">
+        <span><i class="fa-solid fa-phone"></i> (000) 000-0000</span>
+        <span><i class="fa-solid fa-envelope"></i> example@email.com</span>
+        <span><i class="fa-solid fa-location-dot"></i> 2464 Royal Ln. Mesa, New Jersey 45463</span>
+    </div>
+    <div class="topbar-right">
+        <a href="#"><i class="fa-brands fa-facebook-f"></i></a>
+        <a href="#"><i class="fa-brands fa-instagram"></i></a>
+        <a href="#"><i class="fa-brands fa-twitter"></i></a>
+        <a href="#"><i class="fa-brands fa-youtube"></i></a>
+    </div>
+</div>
+
+<!-- Navbar -->
+<nav>
+    <div class="logo">
+        <i class="fa-solid fa-hotel"></i> Royelle
+    </div>
+    <div class="nav-links">
+        <a href="#">Home</a>
+        <a href="#">Rooms & Suites</a>
+        <a href="#">Restaurant</a>
+        <a href="#">Gallery</a>
+        <a href="#">Blog</a>
+        <a href="#">About Us</a>
+        <a href="#">Contact Us</a>
+    </div>
+    <a href="#" class="btn-nav">Book Now</a>
+</nav>
+
+<!-- Hero -->
+<div class="hero">
+    <h1>Room Details</h1>
+    <div class="breadcrumb">
+        <a href="#">Home</a> <span>|</span> <a href="#">Room Details</a>
+    </div>
+</div>
+
+<!-- Main Content -->
+<div class="container" id="mainContent">
+    <div class="loading">Loading room details from database...</div>
+</div>
+
+<script>
+/* =========================================================
+   SUPABASE CONFIG
+   ========================================================= */
+const SUPABASE_URL      = 'https://iflufnduthjzhneahnrf.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_A4oOeh21FiTQN0k_5OvUOg_8F3fMFZs';
+
+let sb = null;
+try {
+    if (SUPABASE_URL.startsWith('http')) {
+        sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    }
+} catch (e) { console.warn('Supabase init failed:', e); }
+
+/* =========================================================
+   DATA FETCHING & RENDERING
+   ========================================================= */
+async function loadRoomDetails() {
+    const container = document.getElementById('mainContent');
+    
+    // Default fallback data in case Supabase fails
+    let room = {
+        room_name: 'Standard Rooms',
+        price: '$150 / Night',
+        description: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.',
+        id: 'demo'
+    };
+
+    if (sb) {
+        try {
+            const { data, error } = await sb.from('rooms').select('*').eq('is_active', true).maybeSingle();
+            if (!error && data) {
+                room = {
+                    id: data.id,
+                    room_name: data.room_name,
+                    price: data.price,
+                    description: data.description || room.description
+                };
+            }
+        } catch (e) {
+            console.warn('Failed to fetch active room:', e);
+        }
+    }
+
+    // Render the UI
+    container.innerHTML = `
+        <!-- Left Column -->
+        <div class="left-col">
+            <div class="gallery">
+                <div class="gallery-thumbs">
+                    <img src="https://images.unsplash.com/photo-1590490360182-c33d57733427?w=500&auto=format&fit=crop" class="active" alt="Thumb 1">
+                    <img src="https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=500&auto=format&fit=crop" alt="Thumb 2">
+                    <img src="https://images.unsplash.com/photo-1618773928121-c32242e63f39?w=500&auto=format&fit=crop" alt="Thumb 3">
+                    <img src="https://images.unsplash.com/photo-1566665797739-1674de7a421a?w=500&auto=format&fit=crop" alt="Thumb 4">
+                </div>
+                <div class="gallery-main">
+                    <img src="https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=1000&auto=format&fit=crop" id="mainImage" alt="Room Main">
+                    <div class="btn-360-overlay">
+                        <button onclick="window.location.href='client.html'">
+                            <i class="fa-solid fa-vr-cardboard" style="font-size: 20px;"></i>
+                            Enter 360° Virtual Tour
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="room-header">
+                <div>
+                    <h2 class="room-title">
+                        ${escapeHtml(room.room_name)}
+                        <span class="badge">Luxury Rooms</span>
+                    </h2>
+                    <div class="rating"><i class="fa-solid fa-star"></i> 4.9 (245 Review)</div>
+                    <div class="location"><i class="fa-solid fa-location-dot"></i> 2464 Royal Ln. Mesa, New Jersey 45463</div>
+                </div>
+                <div class="price">
+                    ${escapeHtml(room.price.split('/')[0])} <span>/ Night</span>
+                </div>
+            </div>
+
+            <div class="specs">
+                <div><i class="fa-solid fa-bed"></i> 1 Bed</div>
+                <div><i class="fa-solid fa-bath"></i> 1 Bath</div>
+                <div><i class="fa-solid fa-vector-square"></i> 300 sqft</div>
+                <div><i class="fa-solid fa-user-group"></i> 2 Guests</div>
+            </div>
+
+            <h3 class="section-title">Overview</h3>
+            <p class="desc-text">${escapeHtml(room.description)}</p>
+
+            <h3 class="section-title">Room Amenities</h3>
+            <div class="amenities-grid">
+                <div class="amenity"><i class="fa-solid fa-snowflake"></i> Air Conditioning</div>
+                <div class="amenity"><i class="fa-solid fa-tv"></i> Flat-Screen TV</div>
+                <div class="amenity"><i class="fa-solid fa-wifi"></i> High-Speed Wi-Fi</div>
+                <div class="amenity"><i class="fa-solid fa-shield-halved"></i> Electronic Safe</div>
+                <div class="amenity"><i class="fa-solid fa-volume-high"></i> Sound System</div>
+                <div class="amenity"><i class="fa-solid fa-mirror"></i> Vanity Mirror</div>
+                <div class="amenity"><i class="fa-solid fa-bath"></i> Bathtub</div>
+                <div class="amenity"><i class="fa-solid fa-couch"></i> Seating Area</div>
+                <div class="amenity"><i class="fa-solid fa-clock"></i> Alarm Clock</div>
+            </div>
+
+            <h3 class="section-title">Location</h3>
+            <img src="https://placehold.co/800x300/e5e5e5/6b6b6b?text=Map+Location" style="width:100%; border-radius:12px;" alt="Map">
+        </div>
+
+        <!-- Right Column (Sidebar) -->
+        <div class="right-col">
+            <div class="sidebar">
+                <h3>Book Room</h3>
+                <div class="form-group">
+                    <label>Your Name *</label>
+                    <input type="text" placeholder="Ex. John Doe">
+                </div>
+                <div class="form-group">
+                    <label>Phone Number *</label>
+                    <input type="text" placeholder="Enter Phone Number">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Check-in Date *</label>
+                        <input type="date">
+                    </div>
+                    <div class="form-group">
+                        <label>Check-out Date *</label>
+                        <input type="date">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Adults *</label>
+                        <select><option>1</option><option>2</option></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Children *</label>
+                        <select><option>0</option><option>1</option></select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Room Type *</label>
+                    <select><option>${escapeHtml(room.room_name)}</option></select>
+                </div>
+                
+                <button class="btn-book" onclick="alert('Booking form submitted!')">Book Now</button>
+                
+                <div class="divider">OR</div>
+                
+                <button class="btn-360-sidebar" onclick="window.location.href='client.html'">
+                    <i class="fa-solid fa-vr-cardboard"></i> View in 360°
+                </button>
+            </div>
+        </div>
+    `;
+
+    // Gallery hover logic
+    const mainImg = document.getElementById('mainImage');
+    const thumbs = document.querySelectorAll('.gallery-thumbs img');
+    thumbs.forEach(thumb => {
+        thumb.addEventListener('mouseenter', () => {
+            thumbs.forEach(t => t.classList.remove('active'));
+            thumb.classList.add('active');
+            mainImg.src = thumb.src.replace('w=500', 'w=1000');
+        });
+    });
+}
+
+function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+}
+
+// Initialize
+loadRoomDetails();
+</script>
+</body>
+</html>

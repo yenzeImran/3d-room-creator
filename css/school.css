@@ -1,0 +1,404 @@
+/* ===================================================================
+   SCHOOL EXTENSIONS — tour overlays, mode rules, panel helpers
+   Load order: creator.css → school.css → app-shell.css
+   app-shell.css overrides visual styling. This file owns behaviour.
+   =================================================================== */
+
+/* =========================================================
+   1. TOUR MODE — fade overlay + HUD
+   Created dynamically by school-tour.js
+   ========================================================= */
+#tour-fade {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  z-index: 9999;
+}
+
+#tour-hud {
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 10px 16px;
+  border-radius: 10px;
+  color: #fff;
+  backdrop-filter: blur(6px);
+  z-index: 100;
+  pointer-events: none;
+  font-family: inherit;
+}
+#tour-hud .tour-room-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #8f8eff;
+  margin-bottom: 3px;
+}
+#tour-hud .tour-hint {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+/* Body class applied by school-tour.js */
+body.tour-mode .sidebar      { display: none !important; }
+body.tour-mode .left-toolbar { display: none !important; }
+body.tour-mode .main-content { width: 100%; flex: 1 1 auto; }
+body.tour-mode #canvas-container { width: 100%; height: 100%; }
+body.tour-mode .zoom-controls { display: none !important; }
+body.tour-mode .canvas-help  { display: none !important; }
+
+/* Body class applied by school-editor.js */
+body.mode-tour .sidebar      { display: none !important; }
+body.mode-tour .left-toolbar { display: none !important; }
+body.mode-tour .canvas-help  { display: none !important; }
+
+/* =========================================================
+   2. SCHOOL / MATERIALS PANELS — visibility per env mode
+   The panels get injected by school-ui.js + school-materials.js.
+   They should only exist when the env type is 'multi-room'.
+   ========================================================= */
+body:not(.mode-multi-room) #school-sections,
+body:not(.mode-multi-room) #materials-section {
+  display: none !important;
+}
+
+/* The old "Create Environment" button makes no sense in Multi-Room
+   because rooms are built individually. Hide it there. */
+body.mode-multi-room button[onclick*="createEnvironment"] {
+  display: none !important;
+}
+
+/* =========================================================
+   3. SUB-TOOLBAR (Room Editor | Overview | Tour)
+   Injected by school-editor.js into .main-content.
+   app-shell.css restyles the container as a floating pill.
+   These rules are the safe base — they apply if app-shell isn't loaded.
+   ========================================================= */
+#sub-toolbar {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  z-index: 200;
+  max-width: calc(100% - 24px);
+}
+.sub-btn {
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(20, 20, 40, 0.85);
+  color: #b0b0d0;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.sub-btn:hover { background: rgba(60, 60, 100, 0.9); color: #fff; }
+.sub-btn.active {
+  background: #5D5CDE;
+  color: #fff;
+  border-color: #8f8eff;
+  box-shadow: 0 0 12px rgba(93, 92, 222, 0.5);
+}
+.sub-info {
+  margin-left: auto;
+  padding: 6px 12px;
+  background: rgba(20, 20, 40, 0.75);
+  color: #b0b0d0;
+  border-radius: 6px;
+  font-size: 11px;
+  backdrop-filter: blur(6px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 50%;
+}
+
+/* =========================================================
+   4. WALL TABS — per-wall selector in Materials panel
+   app-shell.css gives the final look. Base here.
+   ========================================================= */
+.wall-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.wall-tab {
+  position: relative;
+  padding: 7px 4px;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: #333;
+  text-align: center;
+  font-family: inherit;
+}
+.wall-tab:hover { border-color: #5D5CDE; }
+.wall-tab.active {
+  background: #5D5CDE;
+  color: white;
+  border-color: #5D5CDE;
+}
+.wall-tab .wall-color-dot {
+  position: absolute;
+  bottom: 3px;
+  right: 3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  background: #fff;
+}
+
+/* =========================================================
+   5. COLOUR PALETTE — swatch grid used by Materials panel
+   ========================================================= */
+.palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.palette-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s, border-color 0.15s;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
+}
+.palette-swatch:hover {
+  transform: scale(1.15);
+  border-color: #5D5CDE;
+  z-index: 2;
+  position: relative;
+}
+.palette-swatch.active {
+  border-color: #5D5CDE;
+  box-shadow: 0 0 0 2px #5D5CDE;
+}
+
+/* =========================================================
+   6. AI PROMPT textarea (School panel)
+   ========================================================= */
+#aiPrompt {
+  width: 100%;
+  min-height: 64px;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  background: #fff;
+  color: #333;
+  font-family: inherit;
+  font-size: 12px;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s;
+}
+#aiPrompt:focus { border-color: #5D5CDE; }
+
+/* =========================================================
+   7. AI-REFINED PREVIEW BADGE
+   Adds the little ✨ corner marker on refined previews.
+   ========================================================= */
+.preview-image.ai {
+  border-color: #7a5cff;
+  box-shadow: 0 0 0 1px #7a5cff inset;
+  position: relative;
+}
+.preview-image.ai::after {
+  content: '✨';
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  font-size: 11px;
+  text-shadow: 0 0 3px #000;
+}
+
+/* =========================================================
+   8. DOOR DROPDOWNS — the door-from-UI grid in School panel
+   ========================================================= */
+#doorList .wall-assignment-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 3px;
+  padding: 4px 6px;
+  background: #f0f0f0;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+/* Two-column grid for door wall + target selectors */
+.door-creation-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+/* =========================================================
+   9. SCHOOL ROOM LIST — clickable room rows
+   ========================================================= */
+#schoolRoomList .layer-item {
+  cursor: pointer;
+}
+#schoolRoomList .layer-item .layer-group-count {
+  font-size: 10px;
+  color: #888;
+  font-weight: 500;
+}
+
+/* =========================================================
+   10. DEFENSIVE — hide any old env-type UI remnants
+   ========================================================= */
+#envType-fallback { display: none !important; }
+#mode-toolbar { display: none !important; } /* old toolbar, replaced by sub-toolbar */
+
+/* =========================================================
+   11. LOADING / STATUS fallbacks (app-shell has polished versions)
+   ========================================================= */
+.loading {
+  display: none;
+  text-align: center;
+  padding: 16px;
+}
+.spinner {
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #5D5CDE;
+  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 8px;
+}
+@keyframes spin {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* =========================================================
+   12. HELP TEXT inside school panel (line-height baseline)
+   ========================================================= */
+.help-text code {
+  background: #eef1ff;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 10px;
+  color: #3b3aa8;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+/* =========================================================
+   13. SCROLLBAR for school lists
+   ========================================================= */
+#schoolRoomList::-webkit-scrollbar,
+#doorList::-webkit-scrollbar {
+  width: 6px;
+}
+#schoolRoomList::-webkit-scrollbar-thumb,
+#doorList::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 3px;
+}
+
+/* =========================================================
+   INSIDE / OUTSIDE VIEW TOGGLE
+   ========================================================= */
+#room-view-toggle {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  background: rgba(37, 37, 38, 0.95);
+  border: 1px solid #3a3a3a;
+  border-radius: 9px;
+  z-index: 100;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+.room-view-btn {
+  padding: 6px 12px;
+  background: transparent;
+  border: none;
+  color: #999;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.15s;
+  white-space: nowrap;
+  font-family: inherit;
+  letter-spacing: 0.2px;
+}
+.room-view-btn:hover {
+  background: #3a3a3a;
+  color: #e8e8e8;
+}
+.room-view-btn.active {
+  background: #5D5CDE;
+  color: white;
+  box-shadow: 0 0 12px rgba(93, 92, 222, 0.45);
+}
+
+/* Tour / multi-room overrides hide it via JS, but belt-and-braces */
+body.tour-mode #room-view-toggle,
+body.mode-tour #room-view-toggle {
+  display: none !important;
+}
+/* =========================================================
+   360 TOUR — HUD layout (avoid collision with tour-hud)
+   ========================================================= */
+#tour-hud {
+  top: 14px !important;
+  left: 14px !important;
+  right: auto !important;
+}
+
+#tour360-hud {
+  top: 14px !important;
+  left: auto !important;
+  right: 14px !important;
+}
+
+/* Hotspot modal */
+#hs-modal > div { font-family: inherit; }
+
+/* Tour-360 toolbar buttons (created inline by JS) */
+.t360-btn {
+  font-family: inherit;
+}
+/* =========================================================
+   SIDEBAR SECTIONS — plugin groups
+   ========================================================= */
+#school-sections .section-header,
+#materials-section .section-header,
+#ai-config-section .section-header,
+#tour360-section .section-header,
+#materials-library-section .section-header,
+#renderer-section .section-header {
+  border-left: 2px solid #5D5CDE;
+  padding-left: 12px !important;
+}
+
+/* Collapsible by default for the newer heavy panels */
+#materials-library-section .section-body.collapsed,
+#renderer-section .section-body.collapsed,
+#ai-config-section .section-body.collapsed {
+  display: none;
+}
